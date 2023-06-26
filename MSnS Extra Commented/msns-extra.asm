@@ -931,12 +931,12 @@ store_ddrd:
 ;is PTC4 an input?    - see also 'B' code section
 
   lda   feature1_f      ; we haven't copied to RAM yet
-  bit   #wd_2trigb      ;* wd_2trigb = 1. Bit 1 is zero, go to line 939 (TS says bit 0 ????)
-  beq   norm_op_ddrc
+  bit   #wd_2trigb                                                  ;* wd_2trigb = 0. 
+  beq   norm_op_ddrc                                                ;* GO TO LINE 939 
   lda   #%00001111      ; make PTC4 an input for second trigger
   bra   op_ddrc
 	
-norm_op_ddrc:
+norm_op_ddrc:                                                        ;* LINE 939
   lda   #%00011111		; ** Was 11111111
 	
 op_ddrc:
@@ -968,9 +968,9 @@ op_ddrc:
 
 ; Set up the PWM for the Injector (for current limit mode)
 
-  MOV   #T1Timerstop,t1sc	; Stop Timer so it can be set up
+  MOV   #T1Timerstop,t1sc	     ; Stop Timer so it can be set up
   mov   #$00,T1MODH
-  mov   #$64,T1MODL		    ; set timer modulus register to 100 decimal
+  mov   #$64,T1MODL		         ; set timer modulus register to 100 decimal
 ;  mov   #T1SCX_NO_PWM,T1SC0	 ; make this normal port output (PWM MODE is #$5E)
 ;  mov   #T1SCX_NO_PWM,T1SC1	 ; make this normal port output (PWM MODE is #$5E)
   mov   #$00,T1CH0H
@@ -1009,7 +1009,7 @@ store_pwm:
 
   bclr  water,porta		            ; water injection
   bclr  water2,porta                ; 2nd water injection output
-  brset out3sparkd,feature2,w_no3   ;* out3sparkd Bit 4 is clear
+  brset out3sparkd,feature2,w_no3                                ;* out3sparkd =0
   bclr  Output3,portd
 	
 w_no3:
@@ -1025,7 +1025,7 @@ w_no3:
 ;
   lda   #$ff
   sta   page		; select invalid page to make
-					    ;sure we run from flash
+					;sure we run from flash
 						
 ; Set up RAM Variable - also when burning page0 search for "burning page0"
         
@@ -1175,16 +1175,15 @@ w_no3:
 ; possible that this calc could go wrong if a large "addition" was used but then a small
 ; real angle. Shouldn't happen if angles set correctly.
 
-  lda  TriggAngle_f             
+  lda  TriggAngle_f                                                                  ;* TriggAngle_f = 227T (80 degrees)                                                       
   cmp   #57T			        ; check for next cyl mode
-  bhi   init_crang		        ; trigger angle > 20, continue  ;* TriggAngle_f = 80/.352=227, go to line 1183
+  bhi   init_crang		        ; trigger angle > 20, continue                       ;* GO TO LINE 1183
   bset  nextcyl,EnhancedBits4
 	
-init_crang:
+init_crang:                                                                          ;* LINE 1183
   lda   CrankAngle_f                ;* CrankAngle_f = 10/.352=28
   sta   SparkAngle
-  brset EDIS,personality,init_edis  ;* EDIS,personality is clear, go to line 1190 
-
+  brset EDIS,personality,init_edis                                                   ;* EDIS = 0
 ; this won't work for next-cyl but will be ignored at low rpm anyway
 
   lda   TriggAngle_f     ;* = 80/.532=227
@@ -1192,7 +1191,7 @@ init_crang:
   add   #28T			 ; - - 10deg
   sta   DelayAngle       ;* 227-28=199+28=227 (80 degrees)
   lda   SparkHoldCyc_f   ;* = 0
-  bra   init_cont        ;* go to line 1205
+  bra   init_cont                                                                    ;* GO TO LINE 1204
 
 init_edis:
   lda   TriggAngle_f
@@ -1202,13 +1201,13 @@ init_edis:
   lda   #$00
   sta   sawl
 
-init_cont:
+init_cont:                                                                           ;* LINE 1204
   sta   wheelcount		; (HoldSpark)
   brset MSNEON,personality,init_wheel  ;* MSNEON = 0
-  brset WHEEL,personality,init_wheel   ;* WHEEL = 1, go to line 1211
+  brset WHEEL,personality,init_wheel   ;* WHEEL = 1,                                 ;* GO TO LINE 1210
   bra   init_no_hold
 	
-init_wheel:
+init_wheel:                                                                          ;* LINE 1210
   mov   #WHEELINIT,wheelcount	; holdoff for Neon/Wheel ;* WHEELINIT = %11000011, $C3, 195T
   bclr  wsync,EnhancedBits6
   bset  whold,EnhancedBits6
@@ -1219,8 +1218,8 @@ init_wheel:
 ; if 2nd trig rising and falling then store existing value of pin to monitor state
 
   lda   dtmode_f
-  bit   #trig2risefallb  ;* trig2risefallb =0, go to line 1231
-  beq   init_no_hold
+  bit   #trig2risefallb                                        ;* trig2risefallb = 0
+  beq   init_no_hold                                           ;* GO TO LINE 1230
   brclr pin11,portc,iw_rf2
   bset  rise,sparkbits
   bra   init_no_hold
@@ -1228,7 +1227,7 @@ init_wheel:
 iw_rf2:
   bclr  rise,sparkbits
 
-init_no_hold:
+init_no_hold:                                                  ;* LINE 1230
   lda   #$FF
   sta   iTimeH
   sta   iTimeL
@@ -1237,36 +1236,36 @@ init_no_hold:
 ; see if inverted or non-inv output and use a quick bit
 
   lda   SparkConfig1_f		   ; check if noninv or inv spark
-  bit   #M_SC1InvSpark         ;* #M_SC1InvSpark = 1, go to line 1245
-  bne   inspk_inv
+  bit   #M_SC1InvSpark                                        ;* #M_SC1InvSpark = 1
+  bne   inspk_inv                                             ;* GO TO LINE 1244
   bclr  invspk,EnhancedBits4   ; set non-inverted
   bra   inspk_done
 	
-inspk_inv:
+inspk_inv:                                                    ;* LINE 1244
   bset  invspk,EnhancedBits4   ; set inverted
 		
 inspk_done:
   lda   p8feat1_f
-  bit   #                      ;* rotary2b = 0, go to line 1256
-  beq   not_init_rot
+  bit   #rotary2                                              ;* rotary2b = 0
+  beq   not_init_rot                                          ;* GO TO LINE 1255
   bset  rotary2,EnhancedBits5  ; set rotary quick bit
   bclr  wspk,EnhancedBits4	   ; set that we are NOT doing normal wasted spark
   bra   done_rot
 	
-not_init_rot:
+not_init_rot:                                                 ;* LINE 1255
   bclr  rotary2,EnhancedBits5  ; clr rotary quick bit
 
 done_rot:
 
 ; decide if we are doing multiple wasted spark outputs
 
-  brset MSNEON,personality,wsp_init
-  brset WHEEL,personality,wsp_init   ;* WHEEL = 1, go to line 1267
+  brset MSNEON,personality,wsp_init                             ;* MSNEON = 0
+  brset WHEEL,personality,wsp_init                              ;* WHEEL = 1, GO TO LINE 1266
   bra   mv_init			              ; not wasted spark so skip
 	
-wsp_init:
-  brclr REUSE_LED19,outputpins,mv_init  ;* REUSE_LED19 =1
-  brset rotary2,EnhancedBits5,mv_init   ;* rotary2 = 0
+wsp_init:                                                       ;* LINE 1266
+  brclr REUSE_LED19,outputpins,mv_init                          ;* REUSE_LED19 = 1
+  brset rotary2,EnhancedBits5,mv_init                           ;* rotary2 = 0
   bset  wspk,EnhancedBits4	          ; set that we are doing wasted spark
 		
 mv_init:
@@ -1277,18 +1276,18 @@ mv_init:
 
 ;If HEI set bypass to 0v
 
-  brclr HEI7,personality,not_hei7_init  ;* HEI7 =0, go to line 1283
+  brclr HEI7,personality,not_hei7_init                          ;* HEI7 =0, GO TO LINE 1282
   bset  aled,portc
 	
-not_hei7_init:
+not_hei7_init:                                                  ;* LINE 1282
 
-  brclr DUALEDIS,personality,chk_out   ;* DUALEDIS =0, go to line 1288
+  brclr DUALEDIS,personality,chk_out                            ;* DUALEDIS = 0, GO TO LINE 1287
   bset  EDIS,personality	            ; DUALEDIS implies EDIS
 
-chk_out:
+chk_out:                                                        ;* LINE 1287
 **** add in some sanity checks for outputs vs. code base ****
-  lda   personality      ;* personality byte is not clear, go to line 1297
-  bne   check_out_config
+  lda   personality                                             ;* personality = 1
+  bne   check_out_config                                        ;* GO TO LINE 1303
 	
 ;  lda   outputpins		; assumes if personality zero then any outputs are error
 ;  beq   b_dc			; no personality, no outputs
@@ -1301,40 +1300,40 @@ chk_out:
   bset  config_error,feature2
   jmp   done_checks
 
-check_out_config:
-  brclr REUSE_LED17,outputpins,block_neon
+check_out_config:                                               ;* LINE 1303
+  brclr REUSE_LED17,outputpins,block_neon                       ;* REUSE_LED17 = 1, GO TO LINE 1308 
   brclr REUSE_LED19,outputpins,block_neon
   bra   check_msns
 	
-block_neon:
-  brclr MSNEON,personality,check_msns
+block_neon:                                                     ;* LINE 1308
+  brclr MSNEON,personality,check_msns                           ;* MSNEON = 0, GO TO LINE 1314
   mov   #2,tmp4
   bset  config_error,feature2	       ; if MSNEON but haven't reused led17&19 then error
   jmp   done_checks
 
-check_msns:
-  brclr MSNS,personality,check3
+check_msns:                                                      ;* LINE 1314
+  brclr MSNS,personality,check3                                  ;* MNS = 0, GO TO LINE 1322
   brset REUSE_FIDLE,outputpins,check3
   brset REUSE_LED17,outputpins,check3
   mov   #3,tmp4
   bset  config_error,feature2	      ; if MSNS and haven't reused FIDLE or LED17 then error
   jmp   done_checks
 
-check3:                               ; check for idle conflict
+check3:                               ; check for idle conflict  ;* LINE 1322
 
 ;  brclr PWMidle,feature2,check4
   lda   feature13_f
-  bit   #pwmidleb    ;* pwmidleb =1, go to line 1328
-  beq   check4
-  brclr REUSE_FIDLE,outputpins,check4  ;* REUSE_FIDLE =0, go to line 1334
+  bit   #pwmidleb                                                         ;* pwmidleb = 1
+  beq   check4                                                            
+  brclr REUSE_FIDLE,outputpins,check4                                     ;* REUSE_FIDLE = 0, GO TO LINE 1333
   mov   #4,tmp4
   bset  config_error,feature2	     ; trying to use PWM idle and spark on FIDLE
   jmp   done_checks
 
-check4:                              ; check we don't have Water and Fan control as both use X2
+check4:                              ; check we don't have Water and Fan control as both use X2 ;* LINE 1333
   lda   feature3_f
-  bit   #WaterInjb   ;* WaterInjb =0, go to line 1346
-  beq   check5
+  bit   #WaterInjb                                                      ;* WaterInjb = 0
+  beq   check5                                                          ;* GO TO LINE 1345
 ;  brclr WaterInj,feature3,check5
   brclr X2_FAN,outputpins,check5
   mov   #5,tmp4
@@ -1343,8 +1342,8 @@ check4:                              ; check we don't have Water and Fan control
 b_dc:
   jmp   done_checks
 	
-check5:
-  brclr Nitrous,feature1,check6   ;* Nitrous =0, go to line 1357
+check5:                                                                ;* LINE 1345
+  brclr Nitrous,feature1,check6                                        ;* Nitrous = 0, GO TO LINE 1356
   
   lda   feature3_f
   bit   #WaterInjb   
@@ -1354,24 +1353,24 @@ check5:
   bset  config_error,feature2	; X4 water/nitrous pin in conflict
   jmp   done_checks
 
-check6:                         ; 7pin HEI must have spark output B (LED19) defined. For bypass output
-  brclr HEI7,personality,check7   ;* HEI7 =0, go to line 1365
+check6:                         ; 7pin HEI must have spark output B (LED19) defined. For bypass output ;* LINE 1356
+  brclr HEI7,personality,check7                                           ;* HEI7 = 0, GO TO LINE 1364
   
   brset REUSE_LED19,outputpins,check7
   mov   #7,tmp4
   bset  config_error,feature2
   jmp   done_checks
 
-check7:                         ; Do some checks on wasted spark outputs
+check7:                         ; Do some checks on wasted spark outputs  ;* LINE 1364
 
-  brset rotary2,EnhancedBits5,check8a    ;* rotary2 = 0
+  brset rotary2,EnhancedBits5,check8a                                     ;* rotary2 = 0
 	
 ; coilc is the pain - set if LED18=1 and LED18_2=1
 
-  brclr wspk,EnhancedBits4,check8	    ; don't bother if we aren't doing multiple outputs ;* wspk = 0
+  brclr wspk,EnhancedBits4,check8	    ; don't bother if we aren't doing multiple outputs ;* wspk = 1
   brclr WHEEL,personality,check8                                                           ;* wheel = 1
   brset out3sparkd,feature2,ck74	    ; 4th output                                       ;* out3sparkd = 0
-  brclr REUSE_LED18,outputpins,ck72	    ; not 3rd output                                   ;* REUSE_LED18 is clear, go to line 1389
+  brclr REUSE_LED18,outputpins,ck72	    ; not 3rd output                                   ;* REUSE_LED18 is clear, GO TO LINE 1388
   brclr REUSE_LED18_2,outputpins,ck72	; not 3rd output                                   
   bra   ck73				            ; LED18=1 & LED18_2=1                              
 	
@@ -1386,30 +1385,30 @@ ck73:
   beq   ck7err                         
   brclr REUSE_LED19,outputpins,ck7err
 	
-ck72:
-  lda   trig2_f    ;* trig2 = 19T 
+ck72:                                                                                      ;* LINE 1388
+  lda   trig2_f                                                                            ;* trig2 = 19T 
 	
 ck72b:
-  brclr REUSE_LED17,outputpins,ck7err   ;*  REUSE_LED17 = 1                                                                                                                                                                  
+  brclr REUSE_LED17,outputpins,ck7err                                                      ;*  REUSE_LED17 = 1                                                                                                                                                                  
 	
 ck71:
-  lda   trig1_f              ;* trig1_f = 1T                        
+  lda   trig1_f                                                                            ;* trig1_f = 1T                        
   beq   ck7err               
-  bra   check7b				; passed all checks  ;* go to line 1406
+  bra   check7b				; passed all checks                                            ;* GO TO LINE 1404
 	
 ck7err:
   mov   #8,tmp4
   bset  config_error,feature2
   jmp   done_checks
 	
-check7b:	                    ; can't use FIDLE for spark if doing wasted spark
-  brclr REUSE_FIDLE,outputpins,check7c  ;*REUSE-FIDLE = 0, go to line 1413
+check7b:	                    ; can't use FIDLE for spark if doing wasted spark          ;* LINE 1404
+  brclr REUSE_FIDLE,outputpins,check7c                                                     ;* REUSE-FIDLE = 0, GO TO LINE 1411
   
   mov   #9,tmp4
   bset  config_error,feature2
   jmp   done_checks
 
-check7c:
+check7c:                                                                                    ;* LINE 1411
 ; now check other way around
 ; first check for dual dizzy feature
 
@@ -14057,8 +14056,8 @@ ExitSN:
 **
 ***********************************************************************************
 
-EnableN2O:
-  brclr  LaunchControl,feature2,enablen2o_cont  ; Is Launch selected?         ;* LaunchControl = 0, go to line14066
+EnableN2O:                                                                            ;* LINE 14060, LAUNCH CONTROL IS NOT ENABLED SO SKIP ALL DOWN TO LINE 14282 
+  brclr  LaunchControl,feature2,enablen2o_cont  ; Is Launch selected?         
   brclr  Launch,portd,Clr_Nos_Out		        ; Launch on, so nitrous off
   lda    N2Olaunchdel                           ; check the launch/nitrous delay timer
   bne    Clr_Nos_Out                            ; if non-zero then ensure N2O is off
@@ -14279,13 +14278,13 @@ Clr_Nos_PW:
   sta    NosPW			        ; Clear the Nos PW
   
 Nos_Done_Now:
-  rts
+  rts                                                                         ;*  LINE 14282, END OF LAUNCH CONTROL SECTION
 
 ******************************************************************************
 **        Check if were ready to use VE Table 3
 ******************************************************************************
 
-Check_VE3_Table:
+Check_VE3_Table:                                                              ;* lINE 14288, NITROUS VE3 IS NOT USED SO SKIP ALL DOWN TO LINE 14302
   brclr  Nitrous,feature1,Check_VE3_NOS	; Are we using NOS?
   brclr  NosSysOn,EnhancedBits,Check_VE3_Done	; NOS Mode not ready.
   brset  NosIn,portd,Check_VE3_Done	; If input not low dont use VE 3
@@ -14299,15 +14298,15 @@ Check_VE3_NOS:
   
 Check_VE3_Done:
   bclr   UseVE3,EnhancedBits
-  rts
+  rts                                                                         ;* LINE 14302, END OF NITROUS VE3 SECTION 
 
 ******************************************************************************
 **    8x8 Target AFR Tables                            P Ringwood          ***
 **    AFR Table 1 is for VE table 1   AFR Table 2 is for VE table 3        ***
 ******************************************************************************
 
-AFR1_Targets:
-  brset  useVE3,EnhancedBits,No_AFR_ForVE1	  ; If were running VE3 then no need to go any further
+AFR1_Targets:                                                                 ;* LINE 14309, AFR1_TARGETS NOT USED, SKIP ALL DOWN TO LINE 14389
+  brset  useVE3,EnhancedBits,No_AFR_ForVE1	  ; If were running VE3 then no need to go any further  ;* useVE3 = 0, 
   lda    EGOcount		                      ; Are we about to check the ego?
   cmp    EGOcountcmp_f
   beq    Do_Targets		                      ; If yes then get the target from the table
@@ -14386,13 +14385,13 @@ AFR1_STEP_3:
   sta    tmp18
   jsr    VE_STEP_4
   mov    tmp6,afrTarget
-  rts
+  rts                                                                        ;* LINE 14389 END OF AFR1 TARGETS
 
 *****************************************************************************
 **             VE 3 Targets from AFR Table 2
 *****************************************************************************
 
-AFR2_Targets:
+AFR2_Targets:                                                               ;* LINE 1496, AFR2_TARGETS NOT USED, SKIP ALL DOWN TO LINE 14475
   brclr  useVE3,EnhancedBits,No_AFR_ForVE3	; If were not running VE3 then no need to go any further
   lda    EGOcount		                    ; Are we about to check the ego?
   cmp    EGOcountcmp_f
@@ -14472,7 +14471,7 @@ AFR2_STEP_3:
   sta    tmp18
   jsr    VE_STEP_4
   mov    tmp6,afrTarget
-  rts
+  rts                                                              ;* LINE 14475 END OF AFR2 TARGETS
 
 ;------------------------------------------------------------------
 ;now error messages. Exact postion in memory not important
@@ -14652,480 +14651,479 @@ end_of_main:   ; check this var to ensure it does not exceed $DFFF
 
 flash_table0:  ; config variables                                             ;* Tuner Studio Page 4
 
-personality_f   db      %00000001	; Only 1 allowed to be set unless in      ;* 0 Tuner Studio ignmode
+personality_f   db      %00000001	; Only 1 allowed to be set unless in      ;* 0 Tuner Studio ignmode (= %00000100, $3, 3T)
 					                ; EDIS or WHEEL mode, if all are set
 					                ; to 0 then thats fuel only (std MS)!
-;MSNS           equ      1    Megasquirtnspark                                ;* Tuner Studio msnsCyl bit0
-;MSNEON         equ      2    MS neon decoder                                 ;* Tuner Studio neonCrank bit1
-;WHEEL          equ      4    generalised decoder 36-1, 60-2 etc              ;* Tuner Studio wheelon bit2
-
-;WHEEL2         equ      8    If in WHEEL mode then WHEEL2 is 0 = -1  1 = -2  ;* Tuner Studio onetwo bit3
-
-;EDIS           equ      $10  edis                                            ;* Tuner Studio edis bit4
-;DUALEDIS       equ      $20  if in EDIS mode then this allows two edis       ;* Tuner Studio edis bit5
+;MSNS           equ      1    Megasquirtnspark                                ;* Tuner Studio msnsCyl bit0   (= 0)
+;MSNEON         equ      2    MS neon decoder                                 ;* Tuner Studio neonCrank bit1 (= 0)
+;WHEEL          equ      4    generalised decoder 36-1, 60-2 etc              ;* Tuner Studio wheelon bit2   (= 1 wheel)
+;WHEEL2         equ      8    If in WHEEL mode then WHEEL2 is 0 = -1  1 = -2  ;* Tuner Studio onetwo bit3    (= 0)
+;EDIS           equ      $10  edis                                            ;* Tuner Studio edis bit4      (= 0)
+;DUALEDIS       equ      $20  if in EDIS mode then this allows two edis       ;* Tuner Studio edis bit5      (= 0)
 ;                             modules (for edis4 on V8, edis6 on V12)
-;TFI            equ      $40  Ford TFI system                                 ;* Tuner Studio tfi bit6
-;HEI7           equ      $80  GM 7 pin HEI                                    ;* Tuner Studio hei7 bit7
+;TFI            equ      $40  Ford TFI system                                 ;* Tuner Studio tfi bit6       (= 0)
+;HEI7           equ      $80  GM 7 pin HEI                                    ;* Tuner Studio hei7 bit7      (= 0)
 
-outputpins_f    db      %00000110                                             ;* 1 Tuner Studio ????????
+outputpins_f    db      %00000110                                             ;* 1 Tuner Studio ???????? (= %00110010, $32, 50T)
 ;               bits=    76543210
-;       equ 1       FIDLE for Idle Air Valve || spark output (as per MSnS)    ;* Tuner Studio fidleUse bit0
-;       equ 2       LED17 for squirt led     || coila output                  ;* Tuner Studio led17Use bit 1
-;                                                                             ;* Tuner Studio led18Use bit 2
-;                   bit 2    bit 3                                            ;* Tuner Studio led18_2Use bit 3
+;       equ 1       FIDLE for Idle Air Valve || spark output (as per MSnS)    ;* Tuner Studio fidleUse bit0   (= 0 FIDLE)
+;       equ 2       LED17 for squirt led     || coila output                  ;* Tuner Studio led17Use bit1   (= 1 coila)
+;                                                                             ;* Tuner Studio led18Use bit2   (= 0 wled)
+;                   bit 2    bit 3                                            ;* Tuner Studio led18_2Use bit3 (= 0 wled)
 ;                  LED18_2   LED18    function                                
 ;                    0         0       wled                                   
 ;                    0         1       irq
 ;                    1         0       output4 or fan control (see bit 6)
 ;                    1         1       spark c
 
-;REUSE_LED19       equ $10   LED19 for accel led || coilb output              ;* Tuner Studio led19Use bit4
-;X2_FAN            equ $20   X2 = water Inj pulsed out || fan control         ;* Tuner Studio x2use bit5
+;REUSE_LED19       equ $10   LED19 for accel led || coilb output              ;* Tuner Studio led19Use bit4  (= 1 coilb)
+;X2_FAN            equ $20   X2 = water Inj pulsed out || fan control         ;* Tuner Studio x2use bit5     (= 1 fan control)
 ;       ** Please note: Water inj uses X2 to pulse output, X3 will still
 ;                       come on with water inj or NOS depending on which is on
 ;
-;LED18_FAN         equ $40   LED18 output4 || fan control                     ;* Tuner Studio out4FAN bit6
+;LED18_FAN         equ $40   LED18 output4 || fan control                     * Tuner Studio out4FAN bit6    ( = 0 output4)
 ;       ** only allowed if bit 2 = 1 and bit 3 = 0
-;Mulitplex Ign     equ $80   NORMAL || toyota DLI ignition                    ;* Tuner Studio toy_dli bit7
+;Mulitplex Ign     equ $80   NORMAL || toyota DLI ignition                    ;* Tuner Studio toy_dli bit7    ( = 0 NORMAL)
 ; multiplex
 
-SRevLimRPM	    db      240T	; Standard RPM limit for spark retard (rpm*100) ;* 2 Tuner Studio SoftRevLim
-SRevLimAngle	db      56T	    ; Spark retard for above +10 degrees            ;* 3 Tuner Studio SoftLimRetard             
+SRevLimRPM	    db      240T	; Standard RPM limit for spark retard (rpm*100) ;* 2 Tuner Studio SoftRevLim    (%11110000, $F0, 240T)
+SRevLimAngle	db      56T	    ; Spark retard for above +10 degrees            ;* 3 Tuner Studio SoftLimRetard (%00111000, $38, 56T)             
 				                ; 10 = 10 + 10 i.e. -10 start point.
 				                ; So 56T = 10BTDC )
-SRevLimHTime	db      50T	    ; Time in 1/10Sec in Soft limit till            ;* 4 Tuner Studio SoftLimMax
+SRevLimHTime	db      50T	    ; Time in 1/10Sec in Soft limit till            ;* 4 Tuner Studio SoftLimMax  (%00110010, $32, 50T)
 				                ; hard limit cuts in *0.1
 SRevLimCTime	db      10T	    ; NOT USED                                      ;* 5 Not Used
-RevLimit_f	    db      250T	; Hard Rev limiter (rpm*100)                    ;* 6 Tuner Studio HardRevLim
+RevLimit_f	    db      250T	; Hard Rev limiter (rpm*100)                    ;* 6 Tuner Studio HardRevLim  (%11111010, $FA, 250T)
 Out1Lim		    db       0T	    ; Output1 On point in RAW except for            ;* 7 Tuner Studio out1lim
 				                ; TEMPS then its in F -40, so 200F switch
 				                ; on point = 240F
 
-Out1Source	    db      0T	    ; Output 1 source, index from secl,             ;* 8 Tuner Studio out1src
+Out1Source	    db      0T	    ; Output 1 source, index from secl,             ;* 8 Tuner Studio out1src (= %00000000, $0, 0T, = off)
 				                ; Standard Out1source
 				                ; This is secl + val up to 30 (ego2 correction)
 				                ; 31 = Traction control  >31 is not valid as                                                                    
 				                ; this is from RAM
 
-Out2Lim		    db      0T	    ; Output 2 limit As out1Lim                     ;* 9 Tuner Studio out2lim
+Out2Lim		    db      0T	    ; Output 2 limit As out1Lim                     ;* 9 Tuner Studio out2lim (= %00000000, $0, 0T, = 0)
 
-Out2Source	    db      0T	    ; Same as Out1Source                            ;* 10 Tuner Studio out2src
+Out2Source	    db      0T	    ; Same as Out1Source                            ;* 10 Tuner Studio out2src (= %00000000, $0, 0T, = off)
 
-feature1_f	    db      %01000010                                               ;* 11 Tuner Studio ?????? 
-; wd_2trig      equ 1        wheel decoder 2nd trigger i/p - new in 023c9       ;* Tuner Studio wd_2trig bit0
-;               spare                                                           ;* NOT USED bit1
-; whlsim        equ 4        Wheel simulator               off      on          ;* Tuner Studio whlsim bit2
-; taeIgnCount	equ 8        Acceleration Timer      Seconds^ || Engine Cycles  ;* Tuner Studio taeIgnCount bit3
-; NOT USE       equ $10      NOT USED NOW 023                                   ;* NOT USED bit4
-; hybridAlphaN	equ $20      Hybrid Alpha N              OFF^ || OFF            ;* Tuner Studio hybridAN bit5
-; CrankingPW2	equ $40      Fire PW2 during Cranking?   YES^ || NO             ;* Tuner Studio inj2cr bit6
+feature1_f	    db      %01000010                                               ;* 11 Tuner Studio ??????        (= %01001000,  
+; wd_2trig      equ 1        wheel decoder 2nd trigger i/p - new in 023c9       ;* Tuner Studio wd_2trig bit0    (= 0 no second trig)
+;               spare                                                           ;* NOT USED bit1                 (= 0)
+; whlsim        equ 4        Wheel simulator               off      on          ;* Tuner Studio whlsim bit2      (= 0 sim off)
+; taeIgnCount	equ 8        Acceleration Timer      Seconds^ || Engine Cycles  ;* Tuner Studio taeIgnCount bit3 (= 1 cycles)
+; NOT USE       equ $10      NOT USED NOW 023                                   ;* NOT USED bit4                 (= 0)
+; hybridAlphaN	equ $20      Hybrid Alpha N              OFF^ || OFF            ;* Tuner Studio hybridAN bit5    (= 0 hybrid off)
+; CrankingPW2	equ $40      Fire PW2 during Cranking?   YES^ || NO             ;* Tuner Studio inj2cr bit6      (= 1 no pw2 crank)
 ; Nitrous	    equ $80      Nitrous system               OFF || ON
                                                        ;NOT allowed with W Inj
 
-feature2_f	    db      %00000000  ; more features                              ;* 12 Tuner Studio ??????                                               
-; BoostControl	equ 1        Boost Controller           OFF || ON               ;* Tuner Studio boostUse bit0
-; ShiftLight	equ 2        Shift Lights               OFF || ON               ;* Tuner Studio shiftUse bit1
-; LaunchControl	equ 4        launch Control             OFF || ON               ;* Tuner Studio launchUse bit2
+feature2_f	    db      %00000000  ; more features                              ;* 12 Tuner Studio ??????        (= %00000000, $0, 0T)                                              
+; BoostControl	equ 1        Boost Controller           OFF || ON               ;* Tuner Studio boostUse bit0    (= 0 no boost control)
+; ShiftLight	equ 2        Shift Lights               OFF || ON               ;* Tuner Studio shiftUse bit1    (= 0 no shift lights)
+; LaunchControl	equ 4        launch Control             OFF || ON               ;* Tuner Studio launchUse bit2   (= 0 no launch control)
 ; wasPWMidle	equ 8                                                           ;* Tuner Studio  bit3
 ;     only if outputpins_f bit 1 = 0
-; out3sparkd	equ $10      Output 3             Output 3  || Spark D          ;* Tuner Studio out3sparkd bit4
-; min_dwell	    equ $20                                                         ;* Tuner Studio dwellduty50 bit5
-; dwellduty50	equ $40                                                         ;* Tuner Studio dwellduty50 bit6
-; config_error	equ $80    this is only set if non-sense combination            ;* Tuner Studio                                                      bit7
+; out3sparkd	equ $10      Output 3             Output 3  || Spark D          ;* Tuner Studio out3sparkd bit4  (= 0 no spark d)
+; min_dwell	    equ $20                                                         ;* Tuner Studio dwellduty50 bit5 (= 0 no min dwell)
+; dwellduty50	equ $40                                                         ;* Tuner Studio dwellduty50 bit6 (= 0 no dwell duty)
+; config_error	equ $80    this is only set if non-sense combination            ;* Tuner Studio bit7             (= 0 no config error)
 ; of options - don't run.
 
-whlsimcnt       db      04T     ; How many outputs when simulating wheel         ;* 13 Tuner Studio whlsimcnt
-bcFreqDiv_f	    db      3T	    ; Solenoid PW rate BITS 0 1 and 2 used :         ;* 14 Tuner Studio freqDiv                                     
+whlsimcnt       db      04T     ; How many outputs when simulating wheel         ;* 13 Tuner Studio whlsimcnt (N/A)
+bcFreqDiv_f	    db      3T	    ; Solenoid PW rate BITS 0 1 and 2 used :         ;* 14 Tuner Studio freqDiv   (N/A)                                     
 				                ; "INVALID","39.0 Hz","19.5 Hz","13.0 Hz",
 				                ; "9.8 Hz","7.8 Hz","6.5 Hz","5.6 Hz"
-bcUpdate_f	    db      10T	    ; Boost Controller Update Rate in mS             ;* 15 Tuner Studio bcUpdateRate
+bcUpdate_f	    db      10T	    ; Boost Controller Update Rate in mS             ;* 15 Tuner Studio bcUpdateRate (N/A)
                 		        ; (10min   255max)
-bcPgain_f	    db      64T	    ; B Controller P Gain % (0-100% = 0-255 in       ;* 16 Tuner Studio pGain 
+bcPgain_f	    db      64T	    ; B Controller P Gain % (0-100% = 0-255 in       ;* 16 Tuner Studio pGain         (N/A) 
 				                ; MS so MT value displayed = MS*0.3922)
-bcDgain_f	    db      5T	    ; Boost Controller D Gain % (0-100% = 0-255      ;* 17 Tuner Studio dGain
+bcDgain_f	    db      5T	    ; Boost Controller D Gain % (0-100% = 0-255      ;* 17 Tuner Studio dGain         (N/A)
 				                ; in MS so MT value displayed = MS*0.3922)
-ShiftLo_f	    db      58T	    ; Shift light LED start point (rpm*100)          ;* 18 Tuner Studio ShiftLower 
-ShiftHi_f	    db      60T	    ; Shift Light Final point (RPM * 100)            ;* 19 Tuner Studio ShiftUpper
-LaunchLimit_f	db      40T	    ; Hard limit for Launch control (rpm*100)        ;* 20 Tuner Studio LaunchLim                                     
-edisms_f	    db      11T	    ; max rpm for EDIS multi-spark (rpm*100)         ;* 21 Tuner Studio edismultirpm
-NosClt_f	    db      160T	; Nitrous System Min Coolant Temp Minimum        ;* 22 Tuner Studio NosClt
+ShiftLo_f	    db      58T	    ; Shift light LED start point (rpm*100)          ;* 18 Tuner Studio ShiftLower    (N/A) 
+ShiftHi_f	    db      60T	    ; Shift Light Final point (RPM * 100)            ;* 19 Tuner Studio ShiftUpper    (N/A)
+LaunchLimit_f	db      40T	    ; Hard limit for Launch control (rpm*100)        ;* 20 Tuner Studio LaunchLim     (N/A)                                     
+edisms_f	    db      11T	    ; max rpm for EDIS multi-spark (rpm*100)         ;* 21 Tuner Studio edismultirpm  (N/A)
+NosClt_f	    db      160T	; Nitrous System Min Coolant Temp Minimum        ;* 22 Tuner Studio NosClt        (N/A)
 				                ; point of coolant for NOS to enable in (F-40)
-NosRpm_f	    db      30T	    ; Nitrous System Min RPM * 100, 3000rpm is       ;* 23 Tuner Studio NosRpm
+NosRpm_f	    db      30T	    ; Nitrous System Min RPM * 100, 3000rpm is       ;* 23 Tuner Studio NosRpm        (N/A)
 				                ; minimum allowed  (23)
-NosRpmMax_f	    db      60T	    ; Nitrous Max RPM *100 (used for                 ;* 24 Tuner Studio NosRpmMax 
+NosRpmMax_f	    db      60T	    ; Nitrous Max RPM *100 (used for                 ;* 24 Tuner Studio NosRpmMax     (N/A) 
 				                ; interpolating and cutting nos)
 
-Trig1_f		    db       0T	    ; wheel decoding                                 ;* 25 Tuner Studio trig1 (TargetB1)?
-Trig2_f		    db       0T	    ;  "                                             ;* 26 Tuner Studio trig2 (TargetB2)?
-Trig3_f		    db       0T	    ;  "                                             ;* 27 Tuner Studio trig3 (TargetB3)?
-Trig4_f		    db       0T	    ;  "                                             ;* 28 Tuner Studio trig4 (TargetB4)?
-Trig1ret_f	    db       0T	    ;  "                                             ;* 29 Tuner Studio trig1ret (KpaTarg10)?
-Trig2ret_f	    db       0T	    ;  "                                             ;* 30 Tuner Studio trig2ret (KpaTarg40)?
-Trig3ret_f	    db       0T	    ;  "                                             ;* 31 Tuner Studio trig3ret (KpaTarg60)?
-Trig4ret_f	    db       0T	    ;  "                                             ;* 32 Tuner Studio trig4ret (KpaTarg100)?
+Trig1_f		    db       0T	    ; wheel decoding                                 ;* 25 Tuner Studio trig1 (TargetB1)?      (= %00000001, $1, 1T)
+Trig2_f		    db       0T	    ;  "                                             ;* 26 Tuner Studio trig2 (TargetB2)?      (= %00010011, $13, 19T)
+Trig3_f		    db       0T	    ;  "                                             ;* 27 Tuner Studio trig3 (TargetB3)?      (= 0)
+Trig4_f		    db       0T	    ;  "                                             ;* 28 Tuner Studio trig4 (TargetB4)?      (= 0)
+Trig1ret_f	    db       0T	    ;  "                                             ;* 29 Tuner Studio trig1ret (KpaTarg10)?  (= %00001000, $8, 8T
+Trig2ret_f	    db       0T	    ;  "                                             ;* 30 Tuner Studio trig2ret (KpaTarg40)?  (= %00011100, $1C, 28T)
+Trig3ret_f	    db       0T	    ;  "                                             ;* 31 Tuner Studio trig3ret (KpaTarg60)?  (= 0)
+Trig4ret_f	    db       0T	    ;  "                                             ;* 32 Tuner Studio trig4ret (KpaTarg100)? (= 0)
 
-DTmode_f	    db       %01100001  ; DualTable control                          ;* 33 Tuner Studio ???????
+DTmode_f	    db       %01100001  ; DualTable control                          ;* 33 Tuner Studio ???????                (= %01100001, $61, 97T) 
 ;               equ      $10          Normal single table mode ^   || Dual Table Mode   
 ;               equ      $20          Gamma E correction OFF for PW1 || Gamma E ON^     
 ;               equ      $40          Gamma E correction OFF for PW2 || Gamma E ON^     
-alt_i2t2        equ      %00010000  ; inj2: 0 = t1, 1 = t2                              ;* Tuner Studio inj2t bit4
-alt_i1ge        equ      %00100000                                                      ;* Tuner Studio inj1g bit5
-alt_i2ge        equ      %01000000                                                      ;* Tuner Studio inj2g bit6
-trig2fallb      equ      1          ; 0 = rising edge trigger, 1 = falling edge         ;* Tuner Studio trig2fall bit0
-trig2risefallb  equ      2          ; 0 = rising or falling, 1 = rise and falling edge  ;* Tuner Studio trig2fall bit1
+alt_i2t2        equ      %00010000  ; inj2: 0 = t1, 1 = t2                              ;* Tuner Studio inj2t bit4     (= 0 )
+alt_i1ge        equ      %00100000                                                      ;* Tuner Studio inj1g bit5     (= 1 on)
+alt_i2ge        equ      %01000000                                                      ;* Tuner Studio inj2g bit6     (= 1 on) 
+trig2fallb      equ      1          ; 0 = rising edge trigger, 1 = falling edge         ;* Tuner Studio trig2fall bit0 (= 1 falling edge)
+trig2risefallb  equ      2          ; 0 = rising or falling, 1 = rise and falling edge  ;* Tuner Studio trig2fall bit1 (= 0 rising or falling)
 
-latency_f       db       0T         ; "known" latency in spark input to output    ;* 34 Tuner Studio latency
-spare1_2_f      db       0T                                                       ;* 35 Not Used
-spare1_3_f      db       0T                                                       ;* 36 Not Used
-spare1_4_f      db       0T                                                       ;* 37 Not Used
-spare1_5_f      db       0T                                                       ;* 38 Not Used
+latency_f       db       0T         ; "known" latency in spark input to output    ;* 34 Tuner Studio latency (N/A)
+spare1_2_f      db       0T                                                       ;* 35 Not Used             (N/A)
+spare1_3_f      db       0T                                                       ;* 36 Not Used             (N/A)
+spare1_4_f      db       0T                                                       ;* 37 Not Used             (N/A)
+spare1_5_f      db       0T                                                       ;* 38 Not Used             (N/A)
 
-EgoLimitKPa_f	db      255T	    ; MAP KPa Point to change Ego +- limit (39)             ;* 39 Tuner Studio EgoLimKPa                                                                                                                     
-EgoLim2_f	    db      05T	        ; New Ego limit when MAP KPa above EgoLimitKPa_f        ;* 40 Tuner Studio EgoLim2
-LC_Throttle_f	db      30T	        ; Throttle position in RAW data for launch control mode ;* 41 Tuner Studio LachTps
-LC_LimAngle_f	db      42T	        ; Launch control soft limiter angle           ;* 42 Tuner Studio LachDeg
+EgoLimitKPa_f	db      255T	    ; MAP KPa Point to change Ego +- limit (39)             ;* 39 Tuner Studio EgoLimKPa (N/A)                                                                                                                    
+EgoLim2_f	    db      05T	        ; New Ego limit when MAP KPa above EgoLimitKPa_f        ;* 40 Tuner Studio EgoLim2   (N/A)
+LC_Throttle_f	db      30T	        ; Throttle position in RAW data for launch control mode ;* 41 Tuner Studio LachTps   (N/A)
+LC_LimAngle_f	db      42T	        ; Launch control soft limiter angle           ;* 42 Tuner Studio LachDeg             (N/A)
 				                    ; *0.352   -28.4     -10 to 45 allowed        
-LC_Soft_Rpm_f	db      35T	        ; Launch Soft Limit RPM (43)                  ;* 43 Tuner Studio LachRpm
-Over_B_P_f	    db      0T	        ; Over boost Protection KPa setpoint          ;* 44 Tuner Studio OvrBKpa
+LC_Soft_Rpm_f	db      35T	        ; Launch Soft Limit RPM (43)                  ;* 43 Tuner Studio LachRpm             (N/A)
+Over_B_P_f	    db      0T	        ; Over boost Protection KPa setpoint          ;* 44 Tuner Studio OvrBKpa             (N/A)
 				                    ; <100 = no boost protection
-SparkCutNum_f	db      3T	        ; Rev Limiter Hard cut spark cut number to    ;* 45 Tuner Studio HCutSpark                                                               
+SparkCutNum_f	db      3T	        ; Rev Limiter Hard cut spark cut number to    ;* 45 Tuner Studio HCutSpark           (N/A)                                                               
 				                    ; remove sparks from SparkCutBase_f
 
-feature3_f	    db      %00110000   ; (46)                                        ;* 46 Tuner Studio ????????
-KPaTpsOpenb      equ 1                                                            ;* Tuner Studio OLoopEgo bit0
-VarLaunchb       equ 2                                                            ;* Tuner Studio VLaunch bit1
-CltIatIgnitionb  equ 4                                                            ;* Tuner Studio CltAdv bit2
-WaterInjb        equ 8                                                            ;* Tuner Studio WaterInj bit3
-Fuel_SparkHardb  equ $10            ; Fuel or Spark cut for Rev limiter           ;* Tuner Studio HCutType bit4
-FuelSparkCutb    equ $20            ; Fuel or spark cut for Rev limiter           ;* Tuner Studio HCutType bit5
-KnockDetb        equ $40                                                          ;* Tuner Studio KnockOn bit6
-TargetAFRb       equ $80                                                          ;* Tuner Studio AfrTar bit7
+feature3_f	    db      %00110000   ; (46)                                        ;* 46 Tuner Studio ????????   (= %00110000, $30, 48T)
+KPaTpsOpenb      equ 1                                                            ;* Tuner Studio OLoopEgo bit0 (= 0)
+VarLaunchb       equ 2                                                            ;* Tuner Studio VLaunch bit1  (= 0)
+CltIatIgnitionb  equ 4                                                            ;* Tuner Studio CltAdv bit2   (= 0 no coolant advance)
+WaterInjb        equ 8                                                            ;* Tuner Studio WaterInj bit3 (= 0)
+Fuel_SparkHardb  equ $10            ; Fuel or Spark cut for Rev limiter           ;* Tuner Studio HCutType bit4 (= 1 fuel and spark)
+FuelSparkCutb    equ $20            ; Fuel or spark cut for Rev limiter           ;* Tuner Studio HCutType bit5 (= 1 fuel and spark)
+KnockDetb        equ $40                                                          ;* Tuner Studio KnockOn bit6  (= 0)
+TargetAFRb       equ $80                                                          ;* Tuner Studio AfrTar bit7   (= 0)
 
-cltAdvance_f	db      180T        ; Advance ignition whilst temp below this value F -40  ;* 47 Tuner Studio IgAdvTemp
-cltDeg_f	    db      27T         ; Add 1 degree of advance for this value(F)            ;* 48 Tuner Studio IgAdvDeg
+cltAdvance_f	db      180T        ; Advance ignition whilst temp below this value F -40  ;* 47 Tuner Studio IgAdvTemp (N/A)
+cltDeg_f	    db      27T         ; Add 1 degree of advance for this value(F)            ;* 48 Tuner Studio IgAdvDeg  (N/A)
 				                    ; below cltAdvance_f, so if
 				                    ; cltAdvance_f=120(80F) and cltDeg_f=20 then
                                     ; at 10F advance will be 80-10/20= 3.5
-maxAdvAng_f	    db      15T         ; Limit in degrees of advance for coolant              ;* 49 Tuner Studio MaxIatAdv  
+maxAdvAng_f	    db      15T         ; Limit in degrees of advance for coolant              ;* 49 Tuner Studio MaxIatAdv (N/A) 
 				                    ; related advance so it doesnt add loads of
 				                    ; advance when very cold *0.352
-iatDeg_f	    db      18T         ; Iat Temp for 1 degree of retard related              ;* 50 Tuner Studio IgRetDeg                                           
+iatDeg_f	    db      18T         ; Iat Temp for 1 degree of retard related              ;* 50 Tuner Studio IgRetDeg  (N/A)                                          
 				                    ; to IAT, exactly the same as cltDeg_f but
 				                    ; retard rather than advance and
                                     ; IAT rather that CLT. F
-kpaRetard_f	    db      75T         ; Apply the IAT related retard when above              ;* 51 Tuner Studio IatAdvKpa
+kpaRetard_f	    db      75T         ; Apply the IAT related retard when above              ;* 51 Tuner Studio IatAdvKpa  (N/A)
 				                    ; this KPa, to stop retard at tickover
-iatDanger_f	    db      200T        ; Iat Temp to start Retard F -40                       ;* 52 Tuner Studio IgRetTemp
-KnockRpmL_f	    db      55T         ; Knock sensor max rpm RPM*100 (53)                    ;* 53 Tuner Studio KnockRPM  
-KnockRpmLL_f	db      15T         ; Knock sensor min rpm RPM*100                         ;* 54 Tuner Studio KnockRpmL
-KnockKpaL_f	    db      255T        ; knock sensor max KPa                                 ;* 55 Tuner Studio KnockKpa
-KnockRet1_f	    db      06T         ; First Retard amount for knock system *0.352          ;* 56 Tuner Studio KnockRet
-KnockRet2_f	    db      03T         ; Subsequent Retard amount *0.352                      ;* 57 Tuner Studio KnockSb
-KnockAdv_f	    db      03T         ; Advance amount for knock system *0.352               ;* 58 Tuner Studio KnockAdv
-KnockMax_f	    db      15T         ; Max Allowable retard *0.352                          ;* 59 Tuner Studio KnockMax
-KnockTim_f	    db      01T         ; Timer for steps of knock advance / retard            ;* 60 Tuner Studio KnockTim
+iatDanger_f	    db      200T        ; Iat Temp to start Retard F -40                       ;* 52 Tuner Studio IgRetTemp  (N/A)
+KnockRpmL_f	    db      55T         ; Knock sensor max rpm RPM*100 (53)                    ;* 53 Tuner Studio KnockRPM   (N/A) 
+KnockRpmLL_f	db      15T         ; Knock sensor min rpm RPM*100                         ;* 54 Tuner Studio KnockRpmL  (N/A)
+KnockKpaL_f	    db      255T        ; knock sensor max KPa                                 ;* 55 Tuner Studio KnockKpa   (N/A)
+KnockRet1_f	    db      06T         ; First Retard amount for knock system *0.352          ;* 56 Tuner Studio KnockRet   (N/A)
+KnockRet2_f	    db      03T         ; Subsequent Retard amount *0.352                      ;* 57 Tuner Studio KnockSb    (N/A)
+KnockAdv_f	    db      03T         ; Advance amount for knock system *0.352               ;* 58 Tuner Studio KnockAdv   (N/A)
+KnockMax_f	    db      15T         ; Max Allowable retard *0.352                          ;* 59 Tuner Studio KnockMax   (N/A)
+KnockTim_f	    db      01T         ; Timer for steps of knock advance / retard            ;* 60 Tuner Studio KnockTim   (N/A)
 				                    ; to be applied in Seconds 1
-iatpoint_f	    db      100T        ; Water Inj IAT setpoint point F -40 (61)              ;* 61 Tuner Studio WaterIIat
-wateripoint_f	db      120T        ; Water Injection KPa setpoint                         ;* 62 Tuner Studio StartWIKpa
-wateriRpm_f     db      35T         ; Water Injection RPM setpoint RPM*100                 ;* 63 Tuner Studio WaterIRpm
-kpaO2_f		    db      80T         ; KPa Open loop setpoint for no O2 correction          ;* 64 Tuner Studio KpaOn
-tpsO2_f		    db      192T        ; TPS Open Loop setpoint for no O2 correction Raw ADC  ;* 65 Tuner Studio TpsOn
+iatpoint_f	    db      100T        ; Water Inj IAT setpoint point F -40 (61)              ;* 61 Tuner Studio WaterIIat  (N/A)
+wateripoint_f	db      120T        ; Water Injection KPa setpoint                         ;* 62 Tuner Studio StartWIKpa (N/A)
+wateriRpm_f     db      35T         ; Water Injection RPM setpoint RPM*100                 ;* 63 Tuner Studio WaterIRpm  (N/A)
+kpaO2_f		    db      80T         ; KPa Open loop setpoint for no O2 correction          ;* 64 Tuner Studio KpaOn      (N/A)
+tpsO2_f		    db      192T        ; TPS Open Loop setpoint for no O2 correction Raw ADC  ;* 65 Tuner Studio TpsOn      (N/A)
 
-feature4_f	    db      %00000000   ; Another feature bit for enhanced (66)                ;* 66 Tuner Studio ???????
-miss2ndb        equ     1           ; Missing tooth AND 2nd trigger                        ;* Tuner Studio  bit0
-InvertOutOneb   equ     2                                                                  ;* Tuner Studio InvOut1 bit1
-InvertOutTwob   equ     4                                                                  ;* Tuner Studio InvOut2 bit2
-multisparkb     equ     8           ; EDIS multi-spark                                     ;* Tuner Studio edismulti bit3
-KPaDotBoostb    equ     $10                                                                ;* Tuner Studio KPaDotBoost bit4
-DtNosb          equ     $20         ; If DT which Bank do we add NOS PW to (Bank1=0 Bank2=1) ;* Tuner Studio DtNos bit5
-OverRunOnb      equ     $40                                                                ;* Tuner Studio OvrRunC bit6
-KpaDotSetb      equ     $80                                                                ;* Tuner Studio mapProportion4 (AccDecEnrich) bit7
+feature4_f	    db      %00000000   ; Another feature bit for enhanced (66)                ;* 66 Tuner Studio ???????     (= %00000000, $0, 0T)
+miss2ndb        equ     1           ; Missing tooth AND 2nd trigger                        ;* Tuner Studio  bit0        (N/A)
+InvertOutOneb   equ     2                                                                  ;* Tuner Studio InvOut1 bit1 (N/A)
+InvertOutTwob   equ     4                                                                  ;* Tuner Studio InvOut2 bit2 (N/A)
+multisparkb     equ     8           ; EDIS multi-spark                                     ;* Tuner Studio edismulti bit3 (N/A)
+KPaDotBoostb    equ     $10                                                                ;* Tuner Studio KPaDotBoost bit4 (N/A)
+DtNosb          equ     $20         ; If DT which Bank do we add NOS PW to (Bank1=0 Bank2=1) ;* Tuner Studio DtNos bit5     (N/A)
+OverRunOnb      equ     $40                                                                ;* Tuner Studio OvrRunC bit6     (N/A)
+KpaDotSetb      equ     $80                                                                ;* Tuner Studio mapProportion4 (AccDecEnrich) bit7 (N/A)
 
-NosTps_f	    db      200T        ; Nitrous System Min TPS RAW ADC                           ;* 67 Tuner Studio NosTps
-NosAngle_f	    db      50T         ; Nitrous System Angle to remove from ignition *0.352 (68) ;* 68 Tuner Studio NosAngle                                       
-NosFuelLo_f	    db      12T         ; Nitrous Pulse Width to add to fuel at                    ;* 69 Tuner Studio NosPWLo
+NosTps_f	    db      200T        ; Nitrous System Min TPS RAW ADC                           ;* 67 Tuner Studio NosTps   (N/A)
+NosAngle_f	    db      50T         ; Nitrous System Angle to remove from ignition *0.352 (68) ;* 68 Tuner Studio NosAngle (N/A)                                      
+NosFuelLo_f	    db      12T         ; Nitrous Pulse Width to add to fuel at                    ;* 69 Tuner Studio NosPWLo  (N/A)
 				                    ; 3000 rpm *0.1 in mSec this is for                                                         
 				                    ; additional fuel for NOS
-NosFuelHi_f	    db      03T         ; Nitrous Pulse Width to add to fuel at                    ;* 70 Tuner Studio NosPWHi
+NosFuelHi_f	    db      03T         ; Nitrous Pulse Width to add to fuel at                    ;* 70 Tuner Studio NosPWHi      (N/A)
 				                    ; NosRpmMax_f *0.1 in mSec
-ORunRpm_f	    db      17T         ; Max RPM for Over run fuel cut *100                       ;* 71 Tuner Studio OvrRunRpm
-ORunKpa_f	    db      20T         ; Over run fuel cut when below kpa                         ;* 72 Tuner Studio OvrRunKpa
-ORunTPS_f	    db      05T         ; Over run when throttle position lower than this RAW ADC (73) ;* 73 Tuner Studio OvrRnTps
-EfanOnTemp_f	db      234T        ; X2 or LED 17 electric fan output on temp F-40            ;* 74 Tuner Studio efanontemp
-EfanOffTemp_f	db      185T        ; X2 or LED 17 electric fan output off temp F-40           ;* 75 Tuner Studio efanofftemp
+ORunRpm_f	    db      17T         ; Max RPM for Over run fuel cut *100                       ;* 71 Tuner Studio OvrRunRpm    (N/A)
+ORunKpa_f	    db      20T         ; Over run fuel cut when below kpa                         ;* 72 Tuner Studio OvrRunKpa    (N/A)
+ORunTPS_f	    db      05T         ; Over run when throttle position lower than this RAW ADC (73) ;* 73 Tuner Studio OvrRnTps (N/A)
+EfanOnTemp_f	db      234T        ; X2 or LED 17 electric fan output on temp F-40            ;* 74 Tuner Studio efanontemp   (N/A)
+EfanOffTemp_f	db      185T        ; X2 or LED 17 electric fan output off temp F-40           ;* 75 Tuner Studio efanofftemp  (N/A)
 
-feature5_f	    db      %00110011   ; Yet another feature bit (76)                             ;* 76 Tuner Studio ?????
-Fuel_SparkHLCb  equ     1           ; Fuel or Spark cut for Launch                                         ;* Tuner Studio HCutLCType bit0
-FuelSparkLCb    equ     2           ; Fuel or Spark cut for Launch                                         ;* Tuner Studio HCutLCType bit1
-stagedb:        equ     4           ; Roger Enns Staged Mode   xxxx00xx = Staged Off  xxxx01xx = RPM Based ;* Tuner Studio IStagedMode bit2
-stagedModeb:    equ     8           ; Roger Enns Staged Mode   xxxx10xx = MAP Based   xxxx11xx = TPS Based ;* Tuner Studio IStagedMode bit3
+feature5_f	    db      %00110011   ; Yet another feature bit (76)                             ;* 76 Tuner Studio ?????                    ( = %00110011, $0, 0T)
+Fuel_SparkHLCb  equ     1           ; Fuel or Spark cut for Launch                                         ;* Tuner Studio HCutLCType bit0  (=1 fuel and spark)(N/A)
+FuelSparkLCb    equ     2           ; Fuel or Spark cut for Launch                                         ;* Tuner Studio HCutLCType bit1  (=1 fuel and spark)(N/A)
+stagedb:        equ     4           ; Roger Enns Staged Mode   xxxx00xx = Staged Off  xxxx01xx = RPM Based ;* Tuner Studio IStagedMode bit2 (= 0 staged off)
+stagedModeb:    equ     8           ; Roger Enns Staged Mode   xxxx10xx = MAP Based   xxxx11xx = TPS Based ;* Tuner Studio IStagedMode bit3 (=0 map based)
 stagedeither:   equ     $0c         ; either staging                                                       
-BoostCutb:      equ     $10         ; Over boost Cut type, option2 or spark cut                            ;* Tuner Studio OvrBCutType bit4                            
-BoostCut2b:     equ     $20         ; Option2 for Over boost Cut type, fuel only or both fuel and spark    ;* Tuner Studio OvrBCutType bit5    
-NosLagSystemb:  equ     $40         ; Nos Anti-lag System used                                             ;* Tuner Studio NosLagSystem bit6                                             
-SparkTable2b:   equ     $80         ; Second Spark Table                                                   ;* Tuner Studio STTable2On bit7                                                   
+BoostCutb:      equ     $10         ; Over boost Cut type, option2 or spark cut                            ;* Tuner Studio OvrBCutType bit4 (1= fuel and spark)(N/A)                           
+BoostCut2b:     equ     $20         ; Option2 for Over boost Cut type, fuel only or both fuel and spark    ;* Tuner Studio OvrBCutType bit5 (1= fuel and spark)(N/A)   
+NosLagSystemb:  equ     $40         ; Nos Anti-lag System used                                             ;* Tuner Studio NosLagSystem bit6 (=0 no antilag)                                             
+SparkTable2b:   equ     $80         ; Second Spark Table                                                   ;* Tuner Studio STTable2On bit7   (=0 no 2nd spark))                                                  
 
 
-SparkCutNLC_f	db      03T	        ; Launch control spark cut, this is the                      ;* 77 Tuner Studio HCutLCSpark
+SparkCutNLC_f	db      03T	        ; Launch control spark cut, this is the                      ;* 77 Tuner Studio HCutLCSpark (N/A)
 				                    ; amount of sparks to remove from
 				                    ; SparkCutBase_f when in Launch hard cut
-SparkCutBase_f	db      06T	        ; Base number to cut sparks from MS                          ;* 78 Tuner Studio SparkCutBase
+SparkCutBase_f	db      06T	        ; Base number to cut sparks from MS                          ;* 78 Tuner Studio SparkCutBase (N/A)
 				                    ; = MT value - 1
-SCALEFAC_f	    db      255T	    ; Scaling factor for STAGED INJECTION MODE                   ;* 79 Tuner Studio ScaleFac
+SCALEFAC_f	    db      255T	    ; Scaling factor for STAGED INJECTION MODE                   ;* 79 Tuner Studio ScaleFac (N/A)
 				                    ; (prim flow/total flow*100) 255=100% 123=50%
-STGTRANS_f	    db      25T	        ; Staged transition point, rpm*100, kpa,                     ;* 80 Tuner Studio StgTrans
+STGTRANS_f	    db      25T	        ; Staged transition point, rpm*100, kpa,                     ;* 80 Tuner Studio StgTrans (N/A)
 				                    ; or tps raw adc depending on staging
 				                    ; method selected (See feature5_f bits 3-4)
-STGDELTA_f	    db      03T	        ; Staged operation off at (STGTRANS-STGDELTA)                ;* 81 Tuner Studio StgDelta                                                                          
+STGDELTA_f	    db      03T	        ; Staged operation off at (STGTRANS-STGDELTA)                ;* 81 Tuner Studio StgDelta (N/A)                                                                          
 				                    ; so this is raw data as STGTRANS
-BarroHi_f	    db      110T	    ; Barometric Correction Max Limit in KPa (82                 ;* 82 Tuner Studio BarroHi
-BarroLow_f	    db      60T	        ; Barometric Correction Lower Limit in KPa                   ;* 83 Tuner Studio BarroLow
-SparkCutBNum_f	db      03T	        ; Number of sparks to remove from BASE value when Over Boost ;* 84 Tuner Studio SparkCutBNum
-NosLowKpa_f	    db      80T	        ; Minimum KPa to fire Nos Anti-lag                           ;* 85 Tuner Studio NosLowKpa
-NosHiKpa_f	    db      120T	    ; Maximum KPa to fire Nos Anti-lag,                          ;* 86 Tuner Studio NosHiKpa
+BarroHi_f	    db      110T	    ; Barometric Correction Max Limit in KPa (82                 ;* 82 Tuner Studio BarroHi      (= %01110100, $74, 116T)
+BarroLow_f	    db      60T	        ; Barometric Correction Lower Limit in KPa                   ;* 83 Tuner Studio BarroLow     (= %01000011, $43, 67T)
+SparkCutBNum_f	db      03T	        ; Number of sparks to remove from BASE value when Over Boost ;* 84 Tuner Studio SparkCutBNum (N/A)
+NosLowKpa_f	    db      80T	        ; Minimum KPa to fire Nos Anti-lag                           ;* 85 Tuner Studio NosLowKpa    (N/A)
+NosHiKpa_f	    db      120T	    ; Maximum KPa to fire Nos Anti-lag,                          ;* 86 Tuner Studio NosHiKpa     (N/A)
 				                    ; Anti-lag will switch off when this is reached
-Spark2Delay_f	db      00T	        ; Delay for Spark Table 2 to come in when                    ;* 87 Tuner Studio ST2Delay
+Spark2Delay_f	db      00T	        ; Delay for Spark Table 2 to come in when                    ;* 87 Tuner Studio ST2Delay     (N/A)
 				                    ; input received. *0.1   1/10Sec
-Out1UpLim_f	    db      00T	        ; Output 1 top limit for window, so output1                  ;* 88 Tuner Studio Out1UpLim
+Out1UpLim_f	    db      00T	        ; Output 1 top limit for window, so output1                  ;* 88 Tuner Studio Out1UpLim    (N/A)
 				                    ; will go off above this value unless its 0
 				                    ; then its ignored
-Out2UpLim_f	    db      00T	        ; Output 2 top limit for window (89)                         ;* 89 Tuner Studio Out2UpLim
-NumTeeth_f	    db      12T	        ; Number of teeth for wheel decoder                          ;* 90 Tuner Studio numteeth
-MAPThresh_f	    db      30T	        ; MAP dot threshold for Accel Decel                          ;* 91 Tuner Studio mapThresh4                
+Out2UpLim_f	    db      00T	        ; Output 2 top limit for window (89)                         ;* 89 Tuner Studio Out2UpLim    (N/A)
+NumTeeth_f	    db      12T	        ; Number of teeth for wheel decoder                          ;* 90 Tuner Studio numteeth     (= %00100100, $24, 36T)
+MAPThresh_f	    db      30T	        ; MAP dot threshold for Accel Decel                          ;* 91 Tuner Studio mapThresh4   (N/A)                 
 				                    ; Enrichments *10 (KPa/Sec)
 
-feature6_f	    db      %00000000   ; More feature bits (92)                                     ;* 92 Tuner Studio ?????
-VETable3b       equ     1           ; Use VE table 3                                             ;*  Tuner Studio UseVE3 bit0
-TargetAFR3b     equ     2           ; Use Target AFR for VE3                                     ;*  Tuner Studio bit1
-falsetrigb      equ     4           ; 0=Enable false trigger protection, 1=disable   ; testing   ;*  Tuner Studio falsetrig_dis bit2
-wheel_oldb      equ     8           ; 0= new(025) wheel decoder or 1=old(024s9) style ; testing  ;*  Tuner Studio wheel_old bit3
-dualdizzyb      equ     $10         ;                                                            ;*  Tuner Studio dualdizzy bit4
-TractionCb      equ     $20         ; Traction control system on                                 ;*  Tuner Studio TractionOn bit5
-BoostDirb       equ     $40         ; Direction for boost control output                         ;*  Tuner Studio bit6
-NoDecelBoostb   equ     $80         ; No decelleration when in boost                             ;*  Tuner Studio DecelBoost bit7 (TPSRPMTarg)?
+feature6_f	    db      %00000000   ; More feature bits (92)                                     ;* 92 Tuner Studio ?????     (= %00000000, $0, 0T)
+VETable3b       equ     1           ; Use VE table 3                                             ;*  Tuner Studio UseVE3 bit0        (= 0 no VE3)
+TargetAFR3b     equ     2           ; Use Target AFR for VE3                                     ;*  Tuner Studio bit1               (= 0 no target VE3)
+falsetrigb      equ     4           ; 0=Enable false trigger protection, 1=disable   ; testing   ;*  Tuner Studio falsetrig_dis bit2 (= 0 enable false trigger)
+wheel_oldb      equ     8           ; 0= new(025) wheel decoder or 1=old(024s9) style ; testing  ;*  Tuner Studio wheel_old bit3     (= 0 025 decoder)
+dualdizzyb      equ     $10         ;                                                            ;*  Tuner Studio dualdizzy bit4     (= 0 no dual dizzy)
+TractionCb      equ     $20         ; Traction control system on                                 ;*  Tuner Studio TractionOn bit5    (= 0 no traction control)
+BoostDirb       equ     $40         ; Direction for boost control output                         ;*  Tuner Studio bit6               (= 0 no boost direction)
+NoDecelBoostb   equ     $80         ; No decelleration when in boost                             ;*  Tuner Studio DecelBoost bit7 (TPSRPMTarg)? (= 0 no decel in boost)
 
-VE3Delay_f	    db      00T	        ; Delay for VE Table 3 to come in when                       ;* 93 Tuner Studio VE3Delay
+VE3Delay_f	    db      00T	        ; Delay for VE Table 3 to come in when                       ;* 93 Tuner Studio VE3Delay (N/A)
 				                    ; input received. *0.1   1/10Sec
 RPMrate_f:
-	            db      00T		    ; Fuel enrichment in mSec for 3000RPM/Sec                    ;* 94 Tuner Studio RPM1S
+	            db      00T		    ; Fuel enrichment in mSec for 3000RPM/Sec                    ;* 94 Tuner Studio RPM1S    (N/A)
 				                    ; increase or 5% slip if in VSS mode *0.1
-       	        db      100T		; Fuel enrichment in mSec for 4000RPM/Sec                    ;* 95 Tuner Studio RPM2S
+       	        db      100T		; Fuel enrichment in mSec for 4000RPM/Sec                    ;* 95 Tuner Studio RPM2S    (N/A)
 				                    ; increase or 15% slip if in VSS mode *0.1
-             	db      150T		; Fuel enrichment in mSec for 6000RPM/Sec                    ;* 96 Tuner Studio RPM3S
+             	db      150T		; Fuel enrichment in mSec for 6000RPM/Sec                    ;* 96 Tuner Studio RPM3S    (N/A)
 				                    ; increase or 30% slip if in VSS mode *0.1 (96)
-       	        db      200T		; Fuel enrichment in mSec for 10000RPM/Sec                   ;* 97 Tuner Studio RPM4S
+       	        db      200T		; Fuel enrichment in mSec for 10000RPM/Sec                   ;* 97 Tuner Studio RPM4S    (N/A)
 				                    ; increase or 70% slip if in VSS mode *0.1
 
-RPMthresh_f	    db      2T	        ; Threshhold for RPM change for traction                     ;* 98 Tuner Studio RPMThresh
+RPMthresh_f	    db      2T	        ; Threshhold for RPM change for traction                     ;* 98 Tuner Studio RPMThresh (N/A)
 				                    ; (rpm * 1000) because it checks every 1/10
 				                    ; sec and rpm = rpm*100. So 2 = 2000RPM/Sec
 				                    ; threshold
 TractDeg_f:
-	            db      00T		    ; Ignition retard in Degrees for 3000RPM/Sec                 ;* 99 Tuner Studio TractRet1
+	            db      00T		    ; Ignition retard in Degrees for 3000RPM/Sec                 ;* 99 Tuner Studio TractRet1  (N/A)
 				                    ; increase or 5% slip if in VSS mode *0.352
-	            db      56T		    ; Ignition retard in Degrees for 4000RPM/Sec                 ;* 100 Tuner Studio TractRet2
+	            db      56T		    ; Ignition retard in Degrees for 4000RPM/Sec                 ;* 100 Tuner Studio TractRet2  (N/A)
 				                    ; increase or 15% slip if in VSS mode *0.352
-	            db      56T		    ; Ignition retard in Degrees for 6000RPM/Sec                 ;* 101 Tuner Studio TractRet3
+	            db      56T		    ; Ignition retard in Degrees for 6000RPM/Sec                 ;* 101 Tuner Studio TractRet3  (N/A)
 				                    ; increase or 30% slip if in VSS mode *0.352
-	            db      85T	    	; Ignition retard in Degrees for 10000RPM/Sec                ;* 102 Tuner Studio TractRet4
+	            db      85T	    	; Ignition retard in Degrees for 10000RPM/Sec                ;* 102 Tuner Studio TractRet4  (N/A)
 				                    ; increase or 70% slip if in VSS mode *0.352(102)
 TractSpark_f:
-	            db      00T		    ; Spark Cut from Base number for 3000RPM/Sec                 ;* 103 Tuner Studio TractSC1
+	            db      00T		    ; Spark Cut from Base number for 3000RPM/Sec                 ;* 103 Tuner Studio TractSC1  (N/A)
 				                    ; increase or 5% slip if in VSS mode MAX ALLOWED 5
-	            db      00T		    ; Spark Cut from Base number for 4000RPM/Sec                 ;* 104 Tuner Studio TractSC2
+	            db      00T		    ; Spark Cut from Base number for 4000RPM/Sec                 ;* 104 Tuner Studio TractSC2  (N/A)
 				                    ; increase or 15% slip if in VSS mode
-	            db      01T		    ; Spark Cut from Base number for 6000RPM/Sec                 ;* 105 Tuner Studio TractSC3
+	            db      01T		    ; Spark Cut from Base number for 6000RPM/Sec                 ;;* 105 Tuner Studio TractSC3  (N/A)
 				                    ; increase or 30% slip if in VSS mode
-	            db      02T		    ; Spark Cut from Base number for 10000RPM/Sec                ;* 106 Tuner Studio TractSC4
+	            db      02T		    ; Spark Cut from Base number for 10000RPM/Sec                ;* 106 Tuner Studio TractSC4  (N/A)
 				                    ; increase or 70% slip if in VSS mode (106)
 
-BoostKnock_f	db      00T	        ; Boost to remove from controller target when                ;* 107 Tuner Studio KnockBoost
+BoostKnock_f	db      00T	        ; Boost to remove from controller target when                ;* 107 Tuner Studio KnockBoost (N/A)
 				                    ; Knock detected (PSI) so value of MS 1 = 7KPa
-BoostKnMax_f	db      30T	        ; Max Boost to remove when knocking in PSI so                ;* 108 Tuner Studio BoostMaxKn
+BoostKnMax_f	db      30T	        ; Max Boost to remove when knocking in PSI so                ;* 108 Tuner Studio BoostMaxKn (N/A)
 				                    ; send 1 to MS this is 7KPa inside the code
 
-feature7_f	    db      %00000010   ; More feature bits     (109)                                ;* 109 Tuner Studio ????
+feature7_f	    db      %00000010   ; More feature bits     (109)                                ;* 109 Tuner Studio ????         (= %00000010, $2, 2T)
 ; 029g changed to enable dwell by default
-; TractionNos	equ 1   Turn Nos off in Traction Control if traction lost,                       ;*  Tuner Studio TractNOS bit0
+; TractionNos	equ 1   Turn Nos off in Traction Control if traction lost,                       ;*  Tuner Studio TractNOS bit0   (N/A)
 				      ; only if Traction oN TractionCb:feature6 bit 6
-; dwellcont	    equ 2   Real (crude) dwell control                                               ;*  Tuner Studio dwellcont bit1
-; TCcycleSec	equ 4   Hold traction settings for cycles || untill rpm                          ;*  Tuner Studio TractCySec bit2
+; dwellcont	    equ 2   Real (crude) dwell control                                               ;*  Tuner Studio dwellcont bit1  (= 1 dwell control)
+; TCcycleSec	equ 4   Hold traction settings for cycles || untill rpm                          ;*  Tuner Studio TractCySec bit2 (N/A)
 				      ; stable for 0.1S only if Traction ON
 				      ; see TractionCb:feature6 bit 6
-; WheelSensor	equ 8   Traction control    RPM Based || VSS                                     ;*  Tuner Studio TractMode bit3
+; WheelSensor	equ 8   Traction control    RPM Based || VSS                                     ;*  Tuner Studio TractMode bit3  (N/A)
 				      ; only if Traction ON
 				      ; see TractionCb:feature6 bit 6
-; AlphaTarAFR	equ $10  speed density for target afr tables || Alpha-N                          ;*  Tuner Studio KpaTPSTar bit4
+; AlphaTarAFR	equ $10  speed density for target afr tables || Alpha-N                          ;*  Tuner Studio KpaTPSTar bit4  (N/A)
 				      ; only if Target AFR tables ON
 				      ; see TargetAFRb:feature3 bit 8
-; TPSTargetAFR	equ $20    0=  Use Target AFR all the while || 1=Only when                       ;*  Tuner Studio TPSTar bit5
+; TPSTargetAFR	equ $20    0=  Use Target AFR all the while || 1=Only when                       ;*  Tuner Studio TPSTar bit5     (N/A)
 				      ; TPS above AFRTarTPS_f  if Target AFR
 				      ; tables ON
 				      ; see TargetAFRb:feature3 bit 8
-;spare	        equ $40                                                                          ;*  Tuner Studio StagedMap2nd bit6
-;spare	        equ $80                                                                          ;*  Tuner Studio StagedAnd bit7
+;spare	        equ $40                                                                          ;*  Tuner Studio StagedMap2nd bit6 (N/A)
+;spare	        equ $80                                                                          ;*  Tuner Studio StagedAnd bit7    (N/A)
 
-dwellcrank_f	db       60T	; cranking dwell in 0.1ms                                         ;* 110 Tuner Studio dwellcrank
-dwellrun_f	    db       40T	; running  dwell in 0.1ms  (111)                                  ;* 111 Tuner Studio dwellrun
+dwellcrank_f	db       60T	; cranking dwell in 0.1ms                                         ;* 110 Tuner Studio dwellcrank (= %00101101, $2D, 45T)
+dwellrun_f	    db       40T	; running  dwell in 0.1ms  (111)                                  ;* 111 Tuner Studio dwellrun   (= %00011110, $1E, 30T)
 
 TractCycle_f:
-	            db      03T		; Engine cycles to hold enrichment /                              ;* 112 Tuner Studio TractCyc1
+	            db      03T		; Engine cycles to hold enrichment /                              ;* 112 Tuner Studio TractCyc1  (N/A)
 				                ; spark cut / retard for 3000RPM/Sec increase
 				                ; or 5% slip if in VSS mode
-	            db      05T		; Engine cycles to hold enrichment /                              ;* 113 Tuner Studio TractCyc2
+	            db      05T		; Engine cycles to hold enrichment /                              ;* 113 Tuner Studio TractCyc2  (N/A)
 				                ; spark cut / retard for 4000RPM/Sec increase
 				                ; or 15% slip if in VSS mode
-	            db      08T		; Engine cycles to hold enrichment /                              ;* 114 Tuner Studio TractCyc3
+	            db      08T		; Engine cycles to hold enrichment /                              ;* 114 Tuner Studio TractCyc3  (N/A)
 				                ; spark cut / retard for 6000RPM/Sec increase
 				                ; or 30% slip if in VSS mode
-	            db      12T		; Engine cycles to hold enrichment /                              ;* 115 Tuner Studio TractCyc4                               
+	            db      12T		; Engine cycles to hold enrichment /                              ;* 115 Tuner Studio TractCyc4  (N/A)                               
 				                ; spark cut / retard for 15000RPM/Sec increase
 				                ; or 70% slip if in VSS mode
 
-feature8_f	    db      %00000000  ; More feature bits (116)                                      ;* 116 Tuner Studio ????
-; spare 1                                                                                         ;* Tuner Studio bit0
-; spare 2                                                                                         ;* Tuner Studio bit1
-BoostTable3b:   equ     4          ; Use boost table 3 when switch table input on                 ;* Tuner Studio BooTbl2Use bit2
-spkeopb         equ     8          ; Enable spark E output (instead of shiftlight)                ;* Tuner Studio spkeop bit3
-spkfopb         equ     $10        ; Enable spark F output (instead of knock in)                  ;* Tuner Studio spkfop bit4
-DecelMAPb:      equ     $20        ; Use MAP for Decel                                            ;* Tuner Studio bit5
-InterpAcelb:    equ     $40        ; Interpole the accel enrichments down to a setpoint           ;* Tuner Studio bit6
-Out1_Out3b:     equ     $80        ; Output3 only if output1 is on.                               ;* Tuner Studio bit7
+feature8_f	    db      %00000000  ; More feature bits (116)                                      ;* 116 Tuner Studio ????        (= %00000000, $0, 0T)
+; spare 1                                                                                         ;* Tuner Studio bit0            (= 0)
+; spare 2                                                                                         ;* Tuner Studio bit1            (= 0)
+BoostTable3b:   equ     4          ; Use boost table 3 when switch table input on                 ;* Tuner Studio BooTbl2Use bit2 (= 0 no spark e)
+spkeopb         equ     8          ; Enable spark E output (instead of shiftlight)                ;* Tuner Studio spkeop bit3     (= 0 no spark f)
+spkfopb         equ     $10        ; Enable spark F output (instead of knock in)                  ;* Tuner Studio spkfop bit4     (= 0 no mapdot decel)
+DecelMAPb:      equ     $20        ; Use MAP for Decel                                            ;* Tuner Studio bit5            (= 0 no out3)
+InterpAcelb:    equ     $40        ; Interpole the accel enrichments down to a setpoint           ;* Tuner Studio bit6            (= 0 no interp acell)
+Out1_Out3b:     equ     $80        ; Output3 only if output1 is on.                               ;* Tuner Studio bit7            (= 0 no out3)
 
-UDSpeedLo_f	    db       00T	   ; Min speed from the Undriven wheel for                        ;* 117 Tuner Studio TractVSSMin
+UDSpeedLo_f	    db       00T	   ; Min speed from the Undriven wheel for                        ;* 117 Tuner Studio TractVSSMin  (N/A)
 				                   ;traction to work at. Volts *0.0196  5V=255
-UDSpeedLim_f	db      255T	   ; Max speed from the Undriven wheel for                        ;* 118 Tuner Studio TractVSSMax
+UDSpeedLim_f	db      255T	   ; Max speed from the Undriven wheel for                        ;* 118 Tuner Studio TractVSSMax  (N/A)
 				                   ; traction to work at. Volts *0.0196  5V=255
-TCScaleFac_f	db      125T	   ; Difference factor for speed inputs from                      ;* 119 Tuner Studioi TractScale
+TCScaleFac_f	db      125T	   ; Difference factor for speed inputs from                      ;* 119 Tuner Studioi TractScale  (N/A)
 				                   ; driven and undriven inputs
 				                   ; (255=100%) *0.39216
-TCSlipFac_f	    db      25T	       ; Slip allowed between wheel sensors at low                    ;* 120 Tuner Studio TractSlip
+TCSlipFac_f	    db      25T	       ; Slip allowed between wheel sensors at low                    ;* 120 Tuner Studio TractSlip    (N/A)
 				                   ; speed (255=100%) *0.39216
-AFRTarTPS_f	    db      255T	   ; TPS setpoint to go over to switch to target                  ;* 121 Tuner Studio TPSAFRPoint
+AFRTarTPS_f	    db      255T	   ; TPS setpoint to go over to switch to target                  ;* 121 Tuner Studio TPSAFRPoint  (N/A)
 				                   ; afr tables in RAW ADC (121)
-spare1          db      00T                                                                       ;* 122 Not Used
-TCSlipFacH_f	db       5T	       ; Slip allowed between wheel sensors at                        ;* 123 Tuner Studio TractSlipH                                                                                     
+spare1          db      00T                                                                       ;* 122 Not Used                  (N/A)
+TCSlipFacH_f	db       5T	       ; Slip allowed between wheel sensors at                        ;* 123 Tuner Studio TractSlipH   (N/A)                                                                                    
 				                   ; high speed (255=100%) *0.39216
-LC_flatsel_f	db      255T	   ; rpm above which arms flat shift mode                         ;* 124 Tuner Studio LC_flatsel
-bc_max_diff	    db      255T	   ; Boost Controller max Difference in KPa                       ;* 125 Tuner Studio bc_max_diff 
-Out1Hys_f	    db      00T	       ; Hysterisis for Output1 in Raw ADC (126)                      ;* 126 Tuner Studio out1Hysis
-Out2Hys_f	    db      00T	       ; Hysterisis for Output2 in Raw ADC                            ;* 127 Tuner Studio out2Hysis
-LC_flatlim      db      55T        ; flat shift revlimit                                          ;* 128 NOT USED
-DecelKpa_f	    db      255T	   ; No Decel enrichment above this value in                      ;* 129 Tuner Studio DecelKpa                                                       
+LC_flatsel_f	db      255T	   ; rpm above which arms flat shift mode                         ;* 124 Tuner Studio LC_flatsel   (N/A)
+bc_max_diff	    db      255T	   ; Boost Controller max Difference in KPa                       ;* 125 Tuner Studio bc_max_diff  (N/A)
+Out1Hys_f	    db      00T	       ; Hysterisis for Output1 in Raw ADC (126)                      ;* 126 Tuner Studio out1Hysis    (N/A)
+Out2Hys_f	    db      00T	       ; Hysterisis for Output2 in Raw ADC                            ;* 127 Tuner Studio out2Hysis    (N/A)
+LC_flatlim      db      55T        ; flat shift revlimit                                          ;* 128 NOT USED                  (N/A)
+DecelKpa_f	    db      255T	   ; No Decel enrichment above this value in                      ;* 129 Tuner Studio DecelKpa     (N/A)                                                       
 				                   ; KPa (129)
-OverRunT_f	    db      00T	       ; Over Run Timer before enabling over run                      ;* 130 Tuner Studio OvrRunTimr
+OverRunT_f	    db      00T	       ; Over Run Timer before enabling over run                      ;* 130 Tuner Studio OvrRunTimr   (N/A)
 				                   ; in Seconds *1
-BarCorr300_f	db      255T	   ; Correction factor for KPA Factor for                         ;* 131 NOT USED
+BarCorr300_f	db      255T	   ; Correction factor for KPA Factor for                         ;* 131 NOT USED                  (N/A)
 				                   ; 300KPa sensor and 400KPa sensors only.
 				                   ; 255=100% *0.39216
 				                   ; (24%=GM300 28%=6300A Series and
 				                   ; 78%= 6400A series)
 
-Out3Source_f	db      00T	       ; Same as Out1Source                                           ;* 132 Tuner Studio out3src
+Out3Source_f	db      00T	       ; Same as Out1Source                                           ;* 132 Tuner Studio out3src     (N/A)
 
-Out3Lim_f	    db      00T	       ; Output 3 On/Off Limit as per standard MSnS                   ;* 133 Tuner Studio out3lim
-TimerOut3_f	    db      00T	       ; Output 3 OFF delay timer in Seconds (134) *1                 ;* 134 Tuner Studio out3Timer 
-iatBoostSt_f	db      00T	       ; Start point for boost reduction related to                   ;* 135 Tuner Studio IATBoostSt
+Out3Lim_f	    db      00T	       ; Output 3 On/Off Limit as per standard MSnS                   ;* 133 Tuner Studio out3lim     (N/A)
+TimerOut3_f	    db      00T	       ; Output 3 OFF delay timer in Seconds (134) *1                 ;* 134 Tuner Studio out3Timer   (N/A) 
+iatBoostSt_f	db      00T	       ; Start point for boost reduction related to                   ;* 135 Tuner Studio IATBoostSt  (N/A)
 				                   ; IAT when using Boost controller F -40
-iatBoost_f	    db      00T	       ; Amount of IAT to remove 1 PSI from boost                     ;* 136 Tuner Studio IATBoost
+iatBoost_f	    db      00T	       ; Amount of IAT to remove 1 PSI from boost                     ;* 136 Tuner Studio IATBoost    (N/A)
 				                   ; controller F, same theory as cltDeg_f
-tpsBooIAT_f	    db      00T	       ; TPS point to start removing boost from                       ;* 137 Tuner Studio TPSBooIat
+tpsBooIAT_f	    db      00T	       ; TPS point to start removing boost from                       ;* 137 Tuner Studio TPSBooIat   (N/A)
 				                   ; boost controller in RAW ADC
-Out4Source_f	db      00T	       ; Same as Out1Source                                           ;* 138 Tuner Studio out4src bits0 to 4 
-Out4Lim_f	    db      00T	       ; Output 4 On/Off Limit as per MSnS                            ;* 139 Tuner Studio out4lim
-LC_f_slim_f	    db      00T	       ; Retard timing above this rpm in flat shift mode              ;* 140 Tuner Studio LC_f_slim
-LC_f_limangle_f	db      00T	       ; Retard timing to this in flat shift mode                     ;* 141 Tuner Studio LC_f_limangle
-spare3_f	    db      00T	       ;   ** SPARE **                                                ;* 142 NOT USED
-mindischg_f  	db      05T	       ; minimum discharge period for dwell                           ;* 143 Tuner Studio mindischg
+Out4Source_f	db      00T	       ; Same as Out1Source                                           ;* 138 Tuner Studio out4src bits0 to 4 (N/A)
+Out4Lim_f	    db      00T	       ; Output 4 On/Off Limit as per MSnS                            ;* 139 Tuner Studio out4lim       (N/A)
+LC_f_slim_f	    db      00T	       ; Retard timing above this rpm in flat shift mode              ;* 140 Tuner Studio LC_f_slim     (N/A)
+LC_f_limangle_f	db      00T	       ; Retard timing to this in flat shift mode                     ;* 141 Tuner Studio LC_f_limangle (N/A)
+spare3_f	    db      00T	       ;   ** SPARE **                                                ;* 142 NOT USED                   (N/A)
+mindischg_f  	db      05T	       ; minimum discharge period for dwell                           ;* 143 Tuner Studio mindischg     (= %00000101, $5, 5T)
 				                   ; control in mSec *0.1
 
 ;pwm idle was here
 
-tachconf_f      db      0T         ; tach output config (159)                                     ;* 144 Tuner Studio tachconf bits 0 to 2, tachconfdiv bit7
-Trig5_f		    db      0T	       ; wheel decoding (160)                                         ;* 145 Tuner Studio trig5                                         
-Trig6_f		    db      0T	       ;  "                                                           ;* 146 Tuner Studio trig6
-Trig5ret_f	    db      0T	       ;  "                                                           ;* 147 Tuner Studio trig5ret
-Trig6ret_f	    db      0T	       ;  "                                                           ;* 148 Tuner Studio trig6ret
+tachconf_f      db      0T         ; tach output config (159)                                     ;* 144 Tuner Studio tachconf bits 0 to 2, tachconfdiv bit7 (= %00000100, $4, 4T) (X5/JS3, normal)
+Trig5_f		    db      0T	       ; wheel decoding (160)                                         ;* 145 Tuner Studio trig5    (N/A)                                       
+Trig6_f		    db      0T	       ;  "                                                           ;* 146 Tuner Studio trig6    (N/A)
+Trig5ret_f	    db      0T	       ;  "                                                           ;* 147 Tuner Studio trig5ret (N/A)
+Trig6ret_f	    db      0T	       ;  "                                                           ;* 148 Tuner Studio trig6ret (N/A)
 
 
 RPMbasedrate_f:
-	            db	    05T		   ; These next 4 are for adding AE based on engine rpm           ;* 149 Tuner Studio RPMAE4
-                db	    20T		   ; This is the actual engine rpm settings                       ;* 150 Tuner Studio RPMAE3
-	            db	    35T		   ;                                                              ;* 151 Tuner Studio RPMAE2
-	            db	    55T		   ; (167)                                                        ;* 152 Tuner Studio RPMAE1
-RPMAQ_f2        db      01T        ; Amount of fuel to add for 1st area of rpm based AE           ;* 153 Tuner Studio RPMS1
-                db      10T        ; Fuel for 2nd rpm area                                        ;* 154 Tuner Studio RPMS2
-                db      15T        ; Fuel for 3rd                                                 ;* 155 Tuner Studio RPMS3
-RPMAQL_f2:      db      20T        ; Fuel for 4th (171)                                           ;* 156 Tuner Studio RPMS4
+	            db	    05T		   ; These next 4 are for adding AE based on engine rpm           ;* 149 Tuner Studio RPMAE4  (N/A)
+                db	    20T		   ; This is the actual engine rpm settings                       ;* 150 Tuner Studio RPMAE3  (N/A)
+	            db	    35T		   ;                                                              ;* 151 Tuner Studio RPMAE2  (N/A)
+	            db	    55T		   ; (167)                                                        ;* 152 Tuner Studio RPMAE1  (N/A)
+RPMAQ_f2        db      01T        ; Amount of fuel to add for 1st area of rpm based AE           ;* 153 Tuner Studio RPMS1   (N/A)
+                db      10T        ; Fuel for 2nd rpm area                                        ;* 154 Tuner Studio RPMS2   (N/A)
+                db      15T        ; Fuel for 3rd                                                 ;* 155 Tuner Studio RPMS3   (N/A)
+RPMAQL_f2:      db      20T        ; Fuel for 4th (171)                                           ;* 156 Tuner Studio RPMS4   (N/A)
 
-n2odel_launch_f: db     00T        ; delay from launch to nitrous activation                      ;* 157 Tuner Studio N2Odel_launch
-n2odel_flat_f:   db     00T        ; delay from flat shift to nitrous activation                  ;* 158 Tuner Studio N2Odel_flat
-n2oholdon_f:     db     00T        ; how long do extra nitrous fuel and retard hold on            ;* 159 Tuner Studio N2Oholdon 
+n2odel_launch_f: db     00T        ; delay from launch to nitrous activation                      ;* 157 Tuner Studio N2Odel_launch (N/A)
+n2odel_flat_f:   db     00T        ; delay from flat shift to nitrous activation                  ;* 158 Tuner Studio N2Odel_flat   (N/A)
+n2oholdon_f:     db     00T        ; how long do extra nitrous fuel and retard hold on            ;* 159 Tuner Studio N2Oholdon     (N/A)
 
-xxKPaCorr300_f  db      00T        ; KPa correction factor for 400/300KPa sensor (175)            ;* 160 NOT USED
+xxKPaCorr300_f  db      00T        ; KPa correction factor for 400/300KPa sensor (175)            ;* 160 NOT USED                   (N/A)
 
 
 tpsdotrate:
-	            db	    05T		    ; These next 4 are delta points for TPSdot                    ;* 161 Tuner Studio taeRates4
+	            db	    05T		    ; These next 4 are delta points for TPSdot                    ;* 161 Tuner Studio taeRates4   (= %00001010, $A, 10T)
 				                    ; V/Sec
 				                    ; these were hard coded points, now users can
 				                    ; select what values
 				                    ; they want where. *0.1960784 MAX=25.5
-	            db	    20T		    ; So 40 = 0.8V/0.1Sec or 8V/Sec as we check it                ;* 162 NOT USED
+	            db	    20T		    ; So 40 = 0.8V/0.1Sec or 8V/Sec as we check it                ;* 162 (= %00100111, $27, 39T)
 				                    ; every 0.1Sec
-	            db	    40T		    ;                                                             ;* 163 NOT USED
-	            db	    77T		    ; (179)                                                       ;* 164 NOT USED
+	            db	    40T		    ;                                                             ;* 163 (= %01001110, $4E, 78T)
+	            db	    77T		    ; (179)                                                       ;* 164 (= %10010110, $96, 150T)
 mapdotrate_f:
-	            db	    05T		    ; These next 4 are delta points for MAPdot                    ;* 165 Tuner Studio maeRates4
+	            db	    05T		    ; These next 4 are delta points for MAPdot                    ;* 165 Tuner Studio maeRates4 (N/A)
 				                    ; KPa/Sec *10 so 255=2550KPa/Sec as we check it
 				                    ; every 0.1Sec
-                db	    10T		    ;                                                             ;* 166 NOT USED
-	            db	    15T		    ;                                                             ;* 167 NOT USED
-	            db	    25T		    ; (183)                                                       ;* 168 NOT USED
+                db	    10T		    ;                                                             ;* 166 (N/A)
+	            db	    15T		    ;                                                             ;* 167 (N/A)
+	            db	    25T		    ; (183)                                                       ;* 168 (N/A)
 MAPAQ_f:
-	            db	    20T		    ; Enrichment to add in mSec for first Delta                   ;* 169 Tuner Studio maeBins4
+	            db	    20T		    ; Enrichment to add in mSec for first Delta                   ;* 169 Tuner Studio maeBins4  (= %00010100, $14, 20T)
 				                    ; mapdotrate_f when in MAPdot mode *0.1
 				                    ; these are all interpoled values)
-	            db	    50T		    ; Enrichment to add in mSec for second Delta                  ;* 170 NOT USED
+	            db	    50T		    ; Enrichment to add in mSec for second Delta                  ;* 170 (= %00010010, $32, 50T)
 				                    ; mapdotrate_f when in MAPdot mode *0.1
-	            db	    105T		; Enrichment to add in mSec for third Delta                   ;* 171 NOT USED
+	            db	    105T		; Enrichment to add in mSec for third Delta                   ;* 171 (= %01101001, $69, 105T)
 				                    ; mapdotrate_f when in MAPdot mode *0.1
-	            db	    150T		; Enrichment to add in mSec for fourth Delta                  ;* 172 NOT USED
+	            db	    150T		; Enrichment to add in mSec for fourth Delta                  ;* 172 (= %10010110, $96, 150T)
 				                    ; mapdotrate_f when in MAPdot mode *0.1 (187)
 TPSAQ_f1:
-	            db	    20T		    ; Enrichment to add in mSec for first Delta                   ;* 173 Tuner Studio taeBins4 
+	            db	    20T		    ; Enrichment to add in mSec for first Delta                   ;* 173 Tuner Studio taeBins4 (= %00010100, $14, 20T) 
 				                    ; tpsdotrate_f when in TPSdot mode *0.1
-	            db	    50T		    ; Enrichment to add in mSec for second Delta                  ;* 174 NOT USED
+	            db	    50T		    ; Enrichment to add in mSec for second Delta                  ;* 174 (= %00010010, $32, 50T)
 				                    ; tpsdotrate_f when in TPSdot mode *0.1
-	            db	    105T		; Enrichment to add in mSec for third Delta ;                 ;* 175 NOT USED
+	            db	    105T		; Enrichment to add in mSec for third Delta ;                 ;* 175 (= %01101001, $69, 105T)
 				                    ; tpsdotrate_f when in TPSdot mode *0.1
-	            db	    150T		; Enrichment to add in mSec for fourth Delta ;                ;* 176 NOT USED
+	            db	    150T		; Enrichment to add in mSec for fourth Delta ;                ;* 176 (= %10010110, $96, 150T)
 				                    ; tpsdotrate_f when in TPSdot mode *0.1
 
-TPSACOLD_f1	    db      90T	        ; TPSACOLD (ms to add in when cold) *0.1                      ;* 177 Tuner Studio taeColdA4
-TPSTHRESH_f1	db      03T	        ; TPSTHRESH for Accel enrichment when in                      ;* 178 Tuner Studio tpsThresh4
+TPSACOLD_f1	    db      90T	        ; TPSACOLD (ms to add in when cold) *0.1                      ;* 177 Tuner Studio taeColdA4   (= %01011010, $5A, 90T)
+TPSTHRESH_f1	db      03T	        ; TPSTHRESH for Accel enrichment when in                      ;* 178 Tuner Studio tpsThresh4  (= %00000011, $3, 3T)
 				                    ; TPS mode *0.1953125
-TPSASYNC_f1	    db      02T	        ; TPSASYNC (accel enrich time in 1/10                         ;* 179 Tuner Studio taeTime4
+TPSASYNC_f1	    db      02T	        ; TPSASYNC (accel enrich time in 1/10                         ;* 179 Tuner Studio taeTime4    (= %00000010, $2, 2T)
 				                    ; second increments) or in Enfgine Cycles.
-TPSDQ_f1	    db      100T	    ; TPSDQ   (195)                                               ;* 180 Tuner Studio tdePct4
-ACMULT_f1	    db      100T	    ; Cold ACCELMULT                                              ;* 181 Tuner Studio taeColdM4
-OverRunClt_f1	db      100T	    ; No Over run fuel cut when below this                        ;* 182 Tuner Studio OvrRunClt
+TPSDQ_f1	    db      100T	    ; TPSDQ   (195)                                               ;* 180 Tuner Studio tdePct4     (= %01100100, $64, 100T)
+ACMULT_f1	    db      100T	    ; Cold ACCELMULT                                              ;* 181 Tuner Studio taeColdM4   (= %01100100, $64, 100T)
+OverRunClt_f1	db      100T	    ; No Over run fuel cut when below this                        ;* 182 Tuner Studio OvrRunClt   (= %01100100, $64, 100T)
 				                    ; coolant temp F-40 (197)
-AccelDecay_f	db       00T	    ; This is the value in mS that the Accel                      ;* 183 Tuner Studio DecayAcPoint
+AccelDecay_f	db       00T	    ; This is the value in mS that the Accel                      ;* 183 Tuner Studio DecayAcPoint (= %00000000, $0, 0T)
 				                    ; enrichment will end up at when the timer
 				                    ; has run. *0.1
 
-feature9_f	    db      %00000000	;  (199)                                                      ;* 184 Tuner Studio ????
-CrankPWTableb:  equ     1           ; Use cranking PW Table                                       ;* Tuner Studio bit0
-ASETableb:      equ     2           ; After start enrichment use table                            ;* Tuner Studio bit1
-NoAccelASEb:    equ     4           ; No Accel Enrich during After start enrichment               ;* Tuner Studio AccelMapASE bit2
-BaroCorConstb:  equ     8           ; If Alpha-n Mode then do we use MAP for Baro cor constantly. ;* Tuner Studio AlphBaroCor bit3
-RpmAEBased:     equ     $10         ; RPM Based Accel Enrichment                                  ;* Tuner Studio RPMBAsedAE bit4
-MassAirFlwb:    equ     $20         ; Using Mass AirFlow meter instead of a MAP sensor.           ;* Tuner Studio AFMUse bit5
-NoAirFactorb:   equ     $40         ; If using MAF do we use Air Density in fueling cals?         ;* Tuner Studio AirCorAFM bit6
-ConsBarCorb:    equ     $80         ; Constant Bar Cor using MAP on X7                            ;* Tuner Studio ConsBaroCor bit7
+feature9_f	    db      %00000000	;  (199)                                                      ;* 184 Tuner Studio ????          (= %00000000, $0, 0T)
+CrankPWTableb:  equ     1           ; Use cranking PW Table                                       ;* Tuner Studio bit0              (= 0 crank PW table)
+ASETableb:      equ     2           ; After start enrichment use table                            ;* Tuner Studio bit1              (= 0 ASE table)
+NoAccelASEb:    equ     4           ; No Accel Enrich during After start enrichment               ;* Tuner Studio AccelMapASE bit2  (= 0 no AE in ASE)
+BaroCorConstb:  equ     8           ; If Alpha-n Mode then do we use MAP for Baro cor constantly. ;* Tuner Studio AlphBaroCor bit3  (= 0 no alpha N)
+RpmAEBased:     equ     $10         ; RPM Based Accel Enrichment                                  ;* Tuner Studio RPMBAsedAE bit4   (= 0 no RPM base AE)
+MassAirFlwb:    equ     $20         ; Using Mass AirFlow meter instead of a MAP sensor.           ;* Tuner Studio AFMUse bit5       (= 0 no AFM)
+NoAirFactorb:   equ     $40         ; If using MAF do we use Air Density in fueling cals?         ;* Tuner Studio AirCorAFM bit6    (= 0 no air den in MAF)
+ConsBarCorb:    equ     $80         ; Constant Bar Cor using MAP on X7                            ;* Tuner Studio ConsBaroCor bit7  (= 0 no constant baro) 
 
 Pambient_f:     db      100T        ; raw byte value ambient pressure for boost control           ;* 185 Tuner Studio Pambient
+
 
 ; NOTE! do not add any more data to table 0. Any more and stack may collide when in RAM.
 ; ends at $E0C8
@@ -15153,21 +15151,21 @@ VE_f1:                                                                     ;* 0 
 	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (10,0-11)
 	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (11,0-11)  ;* 143
 
-EGOTEMP_f	    db      200T	; EGOTEMP                                   ;* 144 Tuner Studio egoTemp1
-EGOCOUNTCMP_f	db      16T	    ; EGOCOUNTCMP                               ;* 145 Tuner Studio egoCount1
-EGODELTA_f	    db      1T	    ; EGODELTA                                  ;* 146 Tuner Studio egoDelta1
-EGOLIMIT_f	    db      15T	    ; EGOLIMIT                                  ;* 147 Tuner Studio egoLimit1
-REQ_FUEL_f1	    db      155T	; REQFUEL (148)                             ;* 148 Tuner Studio reqfuel1
-DIVIDER_f1	    db      4T	    ; DIVIDER                                   ;* 149 Tuner Studio divider1
-Alternate_f1	db      0	    ; alternate or simult (single table ONLY)   ;* 150 Tuner Studio alternate1
-INJOPEN_f1	    db      10T	    ; INJOPEN                                   ;* 151 Tuner Studio injOpen1
-INJOCFUEL_f1	db      0T	    ; INJOCFUEL  NOT USED NOW !!!!!             ;* 152  NOT USED
+EGOTEMP_f	    db      200T	; EGOTEMP                                   ;* 144 Tuner Studio egoTemp1   (N/A)
+EGOCOUNTCMP_f	db      16T	    ; EGOCOUNTCMP                               ;* 145 Tuner Studio egoCount1  (N/A)
+EGODELTA_f	    db      1T	    ; EGODELTA                                  ;* 146 Tuner Studio egoDelta1  (N/A)
+EGOLIMIT_f	    db      15T	    ; EGOLIMIT                                  ;* 147 Tuner Studio egoLimit1  (N/A)
+REQ_FUEL_f1	    db      155T	; REQFUEL (148)                             ;* 148 Tuner Studio reqfuel1   (= %01101000, $68, 104T)
+DIVIDER_f1	    db      4T	    ; DIVIDER                                   ;* 149 Tuner Studio divider1   (= %00000100, $4, 4T)
+Alternate_f1	db      0	    ; alternate or simult (single table ONLY)   ;* 150 Tuner Studio alternate1 (= %00000000, $0, 0T)
+INJOPEN_f1	    db      10T	    ; INJOPEN                                   ;* 151 Tuner Studio injOpen1   (= %00001001, $9, 9T)
+INJOCFUEL_f1	db      0T	    ; INJOCFUEL  NOT USED NOW !!!!!             ;* 152  NOT USED               (N/A)
 				                ; Kept to fill hole                         
 INJPWM_f1	    db      75T	    ; INJPWM                                    ;* 153 Tuner Studio injPwmP1
 INJPWMT_f1   	db      255T	; INJPWMT                                   ;* 154 Tuner Studio injPwmT1 
-BATTFAC_f1	    db      12T	    ; BATTFAC                                   ;* 155 Tuner Studio battFac1
-rpmk_f1		    db      $05	    ; RPMK[0]                                   ;* 156 Tuner Studio rpmk1 (16 bit)
-		        db      $DC	    ; RPMK[1]                                   ;* 157 Tuner Studio rpmk1
+BATTFAC_f1	    db      12T	    ; BATTFAC                                   ;* 155 Tuner Studio battFac1   (= %00010000, $14, 20T)
+rpmk_f1		    db      $05	    ; RPMK[0]                                   ;* 156 Tuner Studio rpmk1 (16 bit) (= %1011, $B, 11T)
+		        db      $DC	    ; RPMK[1]                                   ;* 157 Tuner Studio rpmk1          (= %10111000, $B8, 184T)
 RPMRANGEVE_f1:
 	            db      5T		; RPMRANGEVE[0]                             ;* 158 Tuner Studio rpmBins1
 	            db      10T		; RPMRANGEVE[1]                             ;* 159
@@ -15195,9 +15193,94 @@ KPARANGEVE_f1:
 	            db      130T	; KPARANGEVE[10]                            ;* 180
 	            db      150T	; KPARANGEVE[11]                            ;* 181
 
-config11_f1	    db      113T	; Config11 (originally 113T for 8 cyl) (182);* 182 Tuner Studio Config1
-config12_f1	    db      112T	; Config12 (originally 112T for 8 injectors);* 183 Tuner Studio Config3(Config2?)
-config13_f1	    db      00T	    ; Config13                                  ;* 184 Tuner Studio Config3
+config11_f1	    db      113T	; Config11 (originally 113T for 8 cyl) (182);* 182 Tuner Studio Config1 (= %00110001, $31, 49T)
+;  Bit 0-1 = MAP Type
+;            00 = MPX4115AP
+;            01 = MPX4250AP
+;            10 = MPXH6300A
+;            11 = MPXH6400A
+;  Bit 2   = Engine Stroke
+;            0 = Four Stroke
+;            1 = Two Stroke
+;  Bit 3   = Injection Type - NOT USED!
+;            0 = Port Injection
+;            1 = Throttle Body
+;  Bit 4-7 = Number of Cylinders
+;            0000 = 1 cylinder
+;            0001 = 2 cylinders
+;            0010 = 3 cylinders
+;            0011 = 4 cylinders
+;            0100 = 5 cylinder
+;            0101 = 6 cylinders
+;            0110 = 7 cylinders
+;            0111 = 8 cylinders
+;            1000 = 9 cylinders
+;            1001 = 10 cylinders
+;            1010 = 11 cylinders
+;            1011 = 12 cylinders
+                                                                            ;* mapType2 bit0 (= 1 250 KPA)
+																			;* mapType2 bit1 (= 0)
+																			;* twoStroke2 bit2 (= 0 Four_Stroke)
+																			;* bit3 Not Used (= 0)
+																			;* nCylinders2 bit4 (= 1 Four Cyl)
+																			;* nCylinders2 bit5 (= 1 Four Cyl)
+																			;* nCylinders2 bit6 (= 0)
+																			;* nCylinders2 bit7 (= 0)
+																			
+config12_f1	    db      112T	; Config12 (originally 112T for 8 injectors);* 183 Tuner Studio Config2 (= %00111010, $3A, 58T)
+;  Bit 0-1 = COOL Sensor Type
+;            00 = GM
+;            01 = User-defined
+;            10 = User-defined
+;            11 = User-Defined
+;  Bit 2-3 = MAT Sensor Type
+;            00 = GM
+;            01 = Undefined
+;            10 = Undefined
+;            11 = Undefined
+;  Bit 4-7 = Number of Injectors
+;            0000 = 1 Injector
+;            0001 = 2 Injectors
+;            0010 = 3 Injectors
+;            0011 = 4 Injectors
+;            0100 = 5 Injectors
+;            0101 = 6 Injectors
+;            0110 = 7 Injectors
+;            0111 = 8 Injectors
+;            1000 = 9 Injectors
+;            1001 = 10 Injectors
+;            1010 = 11 Injectors
+;            1011 = 12 Injectors
+                                                                            ;* cltType2 bit0 (= 0 unknown1)
+																			;* cltType2 bit1 (= 1 unknown2)
+																			;* matType2 bit2 (= 0 unknown1)
+																			;* matType2 bit3 (= 1 unknown2)
+																			;* nInjectors2 bit4 (= 1 Four Cyl)
+																			;* nInjectors2 bit5 (= 1 Four Cyl)
+																			;* nInjectors2 bit6 (= 0)
+																			;* nInjectors2 bit7 (= 0)
+
+config13_f1	    db      00T	    ; Config13                                  ;* 184 Tuner Studio Config3 (= %00001010, $A, 10T)
+;  Bit 0   = Odd-fire averaging
+;            0 = Normal
+;            1 = Odd-Fire
+;  Bit 1   = O2 Sensor Type
+;            0 = Narrow-band (single wire 14.7 stoch)
+;            1 = DIY-WB (Stoch = 2.5V, reverse slope)
+;  Bit 2   = Control Stategy
+;            0 = Speed-Density
+;            1 = Alpha-N
+;  Bit 3   = Barometer Correction
+;            0 = Enrichment Off (set to 100%)
+;            1 = Enrichment On
+                                                                            ;* engineType2 bit0 (= 0 Even Fire)
+																			;* egoType2 bit1    (= 1 Wide Band)
+																			;* algorithm2 bit2  (= 0 Speed Density)
+																			;* baroCorr2 bit3   (= 1 Barocor on)
+																			;* bit4 Not Used (= 0)
+																			;* bit5 Not Used (= 0)
+																			;* bit6 Not Used (= 0)
+																			;* bit7 Not Used (= 0)
 
 EGOrpm_f	    db      13T	    ; RPMOXLIMIT                                ;* 185 Tuner Studio egoRPM1
 FASTIDLEbg_f	db      234T	;                                           ;* 186 Tuner Studio fastIdleT1
@@ -15210,7 +15293,7 @@ flash_table1_end:
         org     $E200
 flash_table2:           ; FUEL 2 - For PW2 when in Dual Table mode, if not       ;* Tuner Studio Page 2
 			            ; in DT mode then this whole page is ignored
-VE_f2:                  ; 12x12 Total Bytes = 144                                ;* 0 Tuner Studio veBins2
+VE_f2:                  ; 12x12 Total Bytes = 144                                ;* 0 Tuner Studio veBins2 (N/A)
 	db      39T,40T,41T,44T,44T,44T,45T,45T,45T,46T,47T,50T ; VE (0,0-11)
 	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (1,0-11)
 	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (2,0-11)
@@ -15224,39 +15307,39 @@ VE_f2:                  ; 12x12 Total Bytes = 144                               
     db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (10,0-11)
     db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (11,0-11)
 
-EGOtemp_f2	        db      200T    ; For second O2 sensor (feature12_f2)       ;* 144 Tuner Studio egoTemp2
-EGOCOUNTCMP_f2	    db      16T	    ; NOT USED                                  ;* 145 NOT USED
-EGOdelta_f2	        db      1T	    ; For second O2 sensor (feature12_f2) (146) ;* 146 Tuner Studio egoDelta2
-EGOlimit_f2	        db      10T     ; For second O2 sensor (feature12_f2)       ;* 147 Tuner Studio egoLimit2
-REQ_FUEL_f2	        db      155T    ; (148)                                     ;* 148 Tuner Studio reqFuel2
-Divider_f2	        db      4T                                                  ;* 149 Tuner Studio divider2
-Alternate_f2	    db      0T	    ; NOT USED                                  ;* 150 Tuner Studio alternate2
-InjOpen_f2	        db      10T                                                 ;* 151 Tuner Studio injOpen2
-InjOCFuel_f2	    db      0T	    ; NOT USED NOW !!!!! Kept to fill hole      ;* 152 NOT USED
-INJPWM_f2	        db      100T                                                ;* 153 Tuner Studio injPwm2
-INJPWMT_f2	        db      255T                                                ;* 154 Tuner Studio injPwmT2
-BATTFAC_f2	        db      12T     ; (155)                                     ;* 155 Tuner Studio battFac2
+EGOtemp_f2	        db      200T    ; For second O2 sensor (feature12_f2)       ;* 144 Tuner Studio egoTemp2   (N/A)
+EGOCOUNTCMP_f2	    db      16T	    ; NOT USED                                  ;* 145 NOT USED                (N/A)
+EGOdelta_f2	        db      1T	    ; For second O2 sensor (feature12_f2) (146) ;* 146 Tuner Studio egoDelta2  (N/A)
+EGOlimit_f2	        db      10T     ; For second O2 sensor (feature12_f2)       ;* 147 Tuner Studio egoLimit2  (N/A)
+REQ_FUEL_f2	        db      155T    ; (148)                                     ;* 148 Tuner Studio reqFuel2   (N/A)
+Divider_f2	        db      4T                                                  ;* 149 Tuner Studio divider2   (N/A)
+Alternate_f2	    db      0T	    ; NOT USED                                  ;* 150 Tuner Studio alternate2 (N/A)
+InjOpen_f2	        db      10T                                                 ;* 151 Tuner Studio injOpen2   (N/A)
+InjOCFuel_f2	    db      0T	    ; NOT USED NOW !!!!! Kept to fill hole      ;* 152 NOT USED                (N/A)
+INJPWM_f2	        db      100T                                                ;* 153 Tuner Studio injPwm2    (N/A)
+INJPWMT_f2	        db      255T                                                ;* 154 Tuner Studio injPwmT2   (N/A)
+BATTFAC_f2	        db      12T     ; (155)                                     ;* 155 Tuner Studio battFac2   (N/A)
 rpmk_f2:	                        ; type=byte  entries=2  total bytes=2       
-	db      $05,$DC		            ; (156,157)                                 ;* 156,157 Tuner Studio rpmk2 (16 bit)
+	db      $05,$DC		            ; (156,157)                                 ;* 156,157 Tuner Studio rpmk2 (16 bit)  (N/A)
 RPMRANGEVE_f2:	                    ; type=byte  entries=8  total bytes=8
-	db      5T,10T,15T,20T,28T,36T,44T,52T,55T,60T,65T,70T                      ;* 158 Tuner Studio rpmBins2
+	db      5T,10T,15T,20T,28T,36T,44T,52T,55T,60T,65T,70T                      ;* 158 Tuner Studio rpmBins2  (N/A)
 KPARANGEVE_f2:                      ; type=byte  entries=8  total bytes=8
-	db      20T,30T,40T,50T,60T,75T,90T,100T,110T,120T,130T,140T                ;* 170 Tuner Studio mapBins2
+	db      20T,30T,40T,50T,60T,75T,90T,100T,110T,120T,130T,140T                ;* 170 Tuner Studio mapBins2  (N/A)
 config11_f2:
-config21_f	       db      113T	    ; NOT USED by code, but MT??(182)           ;* 182 Tuner Studio Config1
+config21_f	       db      113T	    ; NOT USED by code, but MT??(182)           ;* 182 Tuner Studio Config1   (N/A)
 config12_f2:
-config22_f	       db      112T     ; NOT USED                                  ;* 183 Tuner Studio Config3 (Config2?)
+config22_f	       db      112T     ; NOT USED                                  ;* 183 Tuner Studio Config3 (Config2?) (N/A)
 config13_f2:
-config23_f	       db      %00000000       ; (184)                              ;* 184 Tuner Studio Config3
+config23_f	       db      %00000000       ; (184)                              ;* 184 Tuner Studio Config3  (N/A)
 ;                  equ $02   Narrow Band   |  Wide Band   Note: DT bank 2 only (second O2 sensor type)
                                                               ;(feature12_f2)
 ;                  equ $04   Speed Density |  Alpha N     Note: DT bank 2 only
 
-EGOrpm_f2	        db      13T	     ; RPMOXLIMIT for second O2 sensor if used (feature12_f2)   ;* 185 Tuner Studio primePulse2 and egoRPM2 ????
-       		        db      0	     ; not used                                                 ;* 186 Tuner Studio fastIdleT2
-O2targetV_f2	    db      26T	     ; VOLTOXTARGET for second O2 sensor if used (feature12_f2) ;* 187 Tuner Studio egoSwitch2
+EGOrpm_f2	        db      13T	     ; RPMOXLIMIT for second O2 sensor if used (feature12_f2)   ;* 185 Tuner Studio primePulse2 and egoRPM2 ????  (N/A)
+       		        db      0	     ; not used                                                 ;* 186 Tuner Studio fastIdleT2  (N/A)
+O2targetV_f2	    db      26T	     ; VOLTOXTARGET for second O2 sensor if used (feature12_f2) ;* 187 Tuner Studio egoSwitch2  (N/A)
 
-feature12_f2        db      %00000000  ; (188)                                                  ;* 188 Tuner Studio TwoLambda
+feature12_f2        db      %00000000  ; (188)                                                  ;* 188 Tuner Studio TwoLambda  (N/A)
 SecondO2b           equ     1
 				 ; Mode (DTmode_f bit 4)???
 
@@ -15288,23 +15371,23 @@ KPARANGEST_f1:
 				; KPARANGEST[0-b]
 
 ;; org $d3a8  ; stick them up out of the way at known values
-TriggAngle_f	db      171T	; TriggAngle (60 deg)     (168)  *0.352            ;* 168 Tuner Studio TrigAng (= 227T)
-FixedAngle_f	db      0T	    ; FixedAngle   *0.352  -28.4   min -10 Max 80      ;* 169 Tuner Studio FixAng
+TriggAngle_f	db      171T	; TriggAngle (60 deg)     (168)  *0.352            ;* 168 Tuner Studio TrigAng   (= 227T) (80 deg)
+FixedAngle_f	db      0T	    ; FixedAngle   *0.352  -28.4   min -10 Max 80      ;* 169 Tuner Studio FixAng    (= -10 for table, 56T for 10 degrees)
 				                ; THIS MUST BE -10 (0) for non fixed angle
-TrimAngle_f	    db      0T	    ; TrimAngle (NOT cleared on startup)  *0.352       ;* 170 Tuner Studio Trim
-CrankAngle_f	db      56T	    ; Cranking advance (10deg)  *0.352 -28.4           ;* 171 Tuner Studio CrankAng
+TrimAngle_f	    db      0T	    ; TrimAngle (NOT cleared on startup)  *0.352       ;* 170 Tuner Studio Trim      (0 deg)
+CrankAngle_f	db      56T	    ; Cranking advance (10deg)  *0.352 -28.4           ;* 171 Tuner Studio CrankAng  (10 deg)
 				                ;  min -10 max 80
-SparkHoldCyc_f	db      1T	    ; SparkHoldCyc (hold spark x cycles on             ;* 172 Tuner Studio IgHold
+SparkHoldCyc_f	db      1T	    ; SparkHoldCyc (hold spark x cycles on             ;* 172 Tuner Studio IgHold    (0 )
 				                ; stall and restart)
-SparkConfig1_f	db   %00001100	; SparkConfig1 (Normal trigger, trigger            ;* 173 Tuner Studio Trig_plus
+SparkConfig1_f	db   %00001100	; SparkConfig1 (Normal trigger, trigger            ;* 173 Tuner Studio Trig_plus  (= %00001100 )
 				                ; return based low speed spark) Standard MSnS
                                 ; 029g changed default, was %00000100 for non-inverted spark output after re-flash
 ; Sparkconfig1 equates
-M_SC1LngTrg     equ     $01     ; Spark config 1 (0) Long trigger +22.5
-M_SC1XLngTrg    equ     $02     ; Spark config 1 (1) Extra Long trigger +45
-M_SC1TimCrnk    equ     $04     ; Spark config 1 (2) Time based cranking (not trigger return)
-M_SC1InvSpark   equ     $08     ; Spark config 1 (3) Invert spark output
-M_SC1oddfire    equ     $10     ; Spark config 1 (4) Oddfire ignition
+M_SC1LngTrg     equ     $01     ; Spark config 1 (0) Long trigger +22.5                       ;*  (bit0 = 0)
+M_SC1XLngTrg    equ     $02     ; Spark config 1 (1) Extra Long trigger +45                   ;*  (bit1 = 0)
+M_SC1TimCrnk    equ     $04     ; Spark config 1 (2) Time based cranking (not trigger return) ;*  (bit2 = 1 trigger return)
+M_SC1InvSpark   equ     $08     ; Spark config 1 (3) Invert spark output                      ;*  (bit3 = 1 invert spark)
+M_SC1oddfire    equ     $10     ; Spark config 1 (4) Oddfire ignition                         ;*  (bit4 = 0 even fire)
 
 IdleAdvance_f	db	    0T	    ; IdleAdvance *0.342 -28.4 min -10 max 80          ;* 174 Tuner Studio IdleAdv
 IdleTPSThresh_f	db	    0T	    ; below this TPS value idle advance                ;* 175 Tuner Studio IdleAdvTPS
@@ -15328,7 +15411,7 @@ flash_table3_end:
         org     $E400
 flash_table4:                   ; Spark Table 2, used when input switched    ;* Tuner Studio page 5
 				; low if selected
-ST_f2:				; *0.352  -28.4   Min -10 Max 80                         ;* 0 Tuner Studio advTable2
+ST_f2:				; *0.352  -28.4   Min -10 Max 80                         ;* 0 Tuner Studio advTable2  (N/A)
 	db    53T,53T,58T,70T,90T,119T,131T,131T,131T,131T,131T,131T ;(0,0-11)
 	db    53T,53T,58T,70T,87T,113T,119T,119T,119T,119T,119T,119T ;(1,0-11)
 	db    58T,58T,64T,70T,84T,107T,113T,113T,113T,113T,113T,113T ;(2,0-11)
@@ -15343,7 +15426,7 @@ ST_f2:				; *0.352  -28.4   Min -10 Max 80                         ;* 0 Tuner St
 	db    58T,58T,51T,58T,69T,81T,81T,81T,81T,81T,81T,81T        ;(b,0-11)
 
 RPMRANGEST_f2:
-        db      05T,07T,13T,20T,30T,40T,50T,60T,61T,62T,63T,64T             ;* 144 Tuner Studio rpmBins4
+        db      05T,07T,13T,20T,30T,40T,50T,60T,61T,62T,63T,64T             ;* 144 Tuner Studio rpmBins4  (N/A)
 				; RPMRANGEST[0-b]
 
 KPARANGEST_f2:
@@ -15354,7 +15437,7 @@ flash_table4_end:
         org     $E500
 flash_table5:    ; FUEL Table 3 (VE3) used when input switched low if selected  ;* Tuner Studio Page 6
 VE_f3:
-	db      39T,40T,41T,44T,44T,44T,45T,45T,45T,46T,47T,50T ; VE (0,0-11)       ;* 0  Tuner Studio veBins3
+	db      39T,40T,41T,44T,44T,44T,45T,45T,45T,46T,47T,50T ; VE (0,0-11)       ;* 0  Tuner Studio veBins3  (N/A)
 	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (1,0-11)
 	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (2,0-11)
 	db      52T,55T,55T,57T,60T,61T,61T,65T,67T,70T,72T,75T ; VE (3,0-11)
@@ -15367,7 +15450,7 @@ VE_f3:
 	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (10,0-11)
 	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (11,0-11)
 RPMRANGEVE_f3:
-	db      5T	    ; RPMRANGEVE[0] (144)                                      ;* 144 Tuner Studio rpmBins5
+	db      5T	    ; RPMRANGEVE[0] (144)                                      ;* 144 Tuner Studio rpmBins5 (N/A)
 	db      10T	    ; RPMRANGEVE[1]
 	db      15T  	; RPMRANGEVE[2]
 	db      20T	    ; RPMRANGEVE[3]
@@ -15380,7 +15463,7 @@ RPMRANGEVE_f3:
 	db      62T	    ; RPMRANGEVE[10]
 	db      65T	    ; RPMRANGEVE[11]                                         
 KPARANGEVE_f3:
-    db      20T	    ; KPARANGEVE[0] (156)                                    ;* 156 Tuner Studio mapBins5
+    db      20T	    ; KPARANGEVE[0] (156)                                     ;* 156 Tuner Studio mapBins5 (N/A)
 	db      30T	    ; KPARANGEVE[1]
 	db      40T	    ; KPARANGEVE[2]
 	db      50T	    ; KPARANGEVE[3]
@@ -15394,29 +15477,29 @@ KPARANGEVE_f3:
 	db      150T    ; KPARANGEVE[11]
 
 ASEVTbl_f:
-	db      30T	    ; -40F This is the ASE table, only used if               ;* 168 Tuner Studio ASETable1
+	db      30T	    ; -40F This is the ASE table, only used if               ;* 168 Tuner Studio ASETable1 (N/A)
 			        ; $02 set in feature9_f     (168)                        
-	db      20T	    ; -20F  this is in percentage *1 so 30 = 30%             ;* 169 Tuner Studio ASETable2
-	db      15T	    ; 0F                                                     ;* 170 Tuner Studio ASETable3
-	db      12T	    ; 20F                                                    ;* 171 Tuner Studio ASETable4
-	db      10T	    ; 40F                                                    ;* 172 Tuner Studio ASETable5
-	db       9T	    ; 60F                                                    ;* 173 Tuner Studio ASETable6
-	db       8T	    ; 80F                                                    ;* 174 Tuner Studio ASETable7
-	db       7T	    ; 100F                                                   ;* 175 Tuner Studio ASETable8
-	db       6T	    ; 130F                                                   ;* 176 Tuner Studio ASETable9
-	db       5T	    ; 160F   (177)                                           ;* 177 Tuner Studio ASETable10
+	db      20T	    ; -20F  this is in percentage *1 so 30 = 30%             ;* 169 Tuner Studio ASETable2  (N/A)
+	db      15T	    ; 0F                                                     ;* 170 Tuner Studio ASETable3  (N/A)
+	db      12T	    ; 20F                                                    ;* 171 Tuner Studio ASETable4  (N/A)
+	db      10T	    ; 40F                                                    ;* 172 Tuner Studio ASETable5  (N/A)
+	db       9T	    ; 60F                                                    ;* 173 Tuner Studio ASETable6  (N/A)
+	db       8T	    ; 80F                                                    ;* 174 Tuner Studio ASETable7  (N/A)
+	db       7T	    ; 100F                                                   ;* 175 Tuner Studio ASETable8  (N/A)
+	db       6T	    ; 130F                                                   ;* 176 Tuner Studio ASETable9  (N/A)
+	db       5T	    ; 160F   (177)                                           ;* 177 Tuner Studio ASETable10 (N/A)
 
-AWC_f1  	     db      250T	    ; After Start Warmup Time                                                ;* 178 Tuner Studio ASETime
-feature10_f5     db      %00000000  ; (179)                                                                  ;* 179 Tuner Studio 
-aseIgnCountb     equ     1          ;  AFTER START Enrichment Seconds || Engine Cycles^                      ;* Tuner Studio aseIgnCount bit0
-ASEHoldb:        equ     2          ; Hold ASE from decaying for a period of time determined by TimFixASE_f  ;* Tuner Studio ASEFixDe bit1
-MAPHoldb:        equ     4          ; Fix MAP value during Fixed ASE timer                                   ;* Tuner Studio VEFixASE bit2
+AWC_f1  	     db      250T	    ; After Start Warmup Time                                                ;* 178 Tuner Studio ASETime      (N/A)
+feature10_f5     db      %00000000  ; (179)                                                                  ;* 179 Tuner Studio              (N/A)
+aseIgnCountb     equ     1          ;  AFTER START Enrichment Seconds || Engine Cycles^                      ;* Tuner Studio aseIgnCount bit0 (N/A)
+ASEHoldb:        equ     2          ; Hold ASE from decaying for a period of time determined by TimFixASE_f  ;* Tuner Studio ASEFixDe bit1    (N/A)
+MAPHoldb:        equ     4          ; Fix MAP value during Fixed ASE timer                                   ;* Tuner Studio VEFixASE bit2    (N/A)
 
 
-TimFixASE_f     db      5T     ; Amount of time or cycles to hold ase to fixed value (180)                 ;* 180 Tuner Studio ASEFixTim
+TimFixASE_f     db      5T     ; Amount of time or cycles to hold ase to fixed value (180)                 ;* 180 Tuner Studio ASEFixTim      (N/A)
                                ; rather than decay to 0 % over the timer
-CltFixASE_f     db      85T    ; Coolant temp setpoint to use Fixed value ASE                              ;* 181 Tuner Studio ASEFixTemp
-MAPFixASE_f     db      60T    ; If in fixed MAP mode then hold MAP at this value during fixed ASE time    ;* 182 Tuner Studio VEFixValue
+CltFixASE_f     db      85T    ; Coolant temp setpoint to use Fixed value ASE                              ;* 181 Tuner Studio ASEFixTemp     (N/A)
+MAPFixASE_f     db      60T    ; If in fixed MAP mode then hold MAP at this value during fixed ASE time    ;* 182 Tuner Studio VEFixValue     (N/A)
 
 ;NOTE! do not add any more data to table 5. Any more and stack may collide when in RAM.
 
@@ -15457,7 +15540,7 @@ KPARANGEAFR_f1:
 			; (VE3) used when input switched low if selected
 
 AFR_f2:			; This is in RAW ADC so 255 = 5V from O2 sensor
-	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (0,0-7) ;* 80 Tuner Studio afrBins2
+	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (0,0-7) ;* 80 Tuner Studio afrBins2  (N/A)
 	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (1,0-7)
 	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (2,0-7)
 	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (3,0-7)
@@ -15467,7 +15550,7 @@ AFR_f2:			; This is in RAW ADC so 255 = 5V from O2 sensor
 	db      120T,120T,120T,120T,120T,120T,120T,120T; AFR (7,0-7)
 
 RPMRANGEAFR_f2:
-	db      5T	    ; RPMRANGEAF2[0]                             ;* 144 Tuner Studio mapBins7
+	db      5T	    ; RPMRANGEAF2[0]                             ;* 144 Tuner Studio mapBins7 (N/A)
 	db      10T	    ; RPMRANGEAF2[1]
 	db      15T	    ; RPMRANGEAF2[2]
 	db      20T	    ; RPMRANGEAF2[3]
@@ -15476,7 +15559,7 @@ RPMRANGEAFR_f2:
 	db      50T	    ; RPMRANGEAF2[6]
 	db      60T	    ; RPMRANGEAF2[7]
 KPARANGEAFR_f2:
-	db      15T	    ; KPARANGEAF2[0]                             ;* 152 Tuner Studio mapBins7 
+	db      15T	    ; KPARANGEAF2[0]                             ;* 152 Tuner Studio mapBins7 (N/A) 
 	db      30T	    ; KPARANGEAF2[1]
 	db      50T	    ; KPARANGEAF2[2]
 	db      60T	    ; KPARANGEAF2[3]
@@ -15486,29 +15569,29 @@ KPARANGEAFR_f2:
 	db      150T	; KPARANGEAF2[7]
 
 ; 2nd stage of nitrous
-Nos2Rpm_f     db     255T  ; rpm starts at            ;* 160 Tuner Studio Nos2Rpm
-Nos2RpmMax_f  db     255T  ; rpm ends st              ;* 161 Tuner Studio Nos2RpmMax
-Nos2delay_f   db     0T    ; delay after stage 1      ;* 162 Tuner Studio Nos2Delay
-Nos2Angle_f   db     0T    ; retard                   ;* 163 Tuner Studio Nos2Angle
-Nos2PWLo_f    db     0T    ; +pw at low rpm           ;* 164 Tuner Studio Nos2PWLo
-Nos2PWHi_f    db     0T    ; +pw at max rpm           ;* 165 Tuner Studio Nos2PWHi
+Nos2Rpm_f     db     255T  ; rpm starts at            ;* 160 Tuner Studio Nos2Rpm    (N/A)
+Nos2RpmMax_f  db     255T  ; rpm ends st              ;* 161 Tuner Studio Nos2RpmMax (N/A)
+Nos2delay_f   db     0T    ; delay after stage 1      ;* 162 Tuner Studio Nos2Delay  (N/A)
+Nos2Angle_f   db     0T    ; retard                   ;* 163 Tuner Studio Nos2Angle  (N/A)
+Nos2PWLo_f    db     0T    ; +pw at low rpm           ;* 164 Tuner Studio Nos2PWLo   (N/A)
+Nos2PWHi_f    db     0T    ; +pw at max rpm           ;* 165 Tuner Studio Nos2PWHi   (N/A)
 
 ; oddfire wheel decoder bits - very experimental
-outaoffs_f   db     0T    ; offset in steps           ;* 166 Tuner Studio outaoffs
+outaoffs_f   db     0T    ; offset in steps           ;* 166 Tuner Studio outaoffs   (N/A)
 ;bit0 = 0, 22.5             ignore for now
 ;bit1 = 0, 45               use 0 or 45 or 90 only
 ;bit2 = 0, 90
-outaoffv_f   db     0T    ; 0-45deg variable offset   ;* 167 Tuner Studio outaoffv
-outboffs_f   db     0T                                ;* 168 Tuner Studio outboffs
-outboffv_f   db     0T                                ;* 169 Tuner Studio outboffv
-outcoffs_f   db     0T                                ;* 170 Tuner Studio outcoffs
-outcoffv_f   db     0T                                ;* 171 Tuner Studio outcoffv
-outdoffs_f   db     0T                                ;* 172 Tuner Studio outdoffs
-outdoffv_f   db     0T                                ;* 173 Tuner Studio outdoffv
-outeoffs_f   db     0T                                ;* 174 Tuner Studio outeoffs
-outeoffv_f   db     0T                                ;* 175 Tuner Studio outeoffv
-outfoffs_f   db     0T                                ;* 176 Tuner Studio outfoffs
-outfoffv_f   db     0T                                ;* 177 Tuner Studio outfoffv
+outaoffv_f   db     0T    ; 0-45deg variable offset   ;* 167 Tuner Studio outaoffv   (N/A)
+outboffs_f   db     0T                                ;* 168 Tuner Studio outboffs   (N/A)
+outboffv_f   db     0T                                ;* 169 Tuner Studio outboffv   (N/A)
+outcoffs_f   db     0T                                ;* 170 Tuner Studio outcoffs   (N/A)
+outcoffv_f   db     0T                                ;* 171 Tuner Studio outcoffv   (N/A)
+outdoffs_f   db     0T                                ;* 172 Tuner Studio outdoffs   (N/A)
+outdoffv_f   db     0T                                ;* 173 Tuner Studio outdoffv   (N/A)
+outeoffs_f   db     0T                                ;* 174 Tuner Studio outeoffs   (N/A)
+outeoffv_f   db     0T                                ;* 175 Tuner Studio outeoffv   (N/A)
+outfoffs_f   db     0T                                ;* 176 Tuner Studio outfoffs   (N/A)
+outfoffv_f   db     0T                                ;* 177 Tuner Studio outfoffv   (N/A)
 
 flash_table6_end:
 
@@ -15518,7 +15601,7 @@ flash_table7:                                  Tuner Studio Page 8
 
 ;boost controller, kpa target rpm vs tps  6x6
 bc_kpa_f:
-	db      100T,100T,100T,100T,100T,100T                        ;* 0 Tuner Studio bcBins1
+	db      100T,100T,100T,100T,100T,100T                        ;* 0 Tuner Studio bcBins1   (N/A)
 	db      100T,120T,120T,120T,120T,120T
 	db      100T,120T,120T,120T,120T,120T
 	db      100T,120T,120T,120T,120T,120T
@@ -15526,14 +15609,14 @@ bc_kpa_f:
 	db      100T,120T,120T,120T,120T,120T
 
 RPMRANGEbc_f:
-	db      10T,20T,30T,40T,50T,70T   ; RPMRANGEbc[0-5]           ;* 36 Tuner Studio bcrpmBins1
+	db      10T,20T,30T,40T,50T,70T   ; RPMRANGEbc[0-5]           ;* 36 Tuner Studio bcrpmBins1 (N/A)
 TPSRANGEbc_f:
-	db      51T,77T,102T,127T,179T,230T   ; TPSRANGEbc[0-5]       ;* 42 Tuner Studio bctpsBins1
+	db      51T,77T,102T,127T,179T,230T   ; TPSRANGEbc[0-5]       ;* 42 Tuner Studio bctpsBins1 (N/A)
 
 ;boost controller, duty cycle target rpm vs tps
 
 bc_dc_f:
-	db      50T,50T,50T,50T,50T,50T                               ;* 48 Tuner Studio bcBins2
+	db      50T,50T,50T,50T,50T,50T                               ;* 48 Tuner Studio bcBins2    (N/A)
 	db      50T,50T,50T,50T,50T,50T
 	db      50T,50T,50T,50T,50T,50T
 	db      50T,50T,50T,50T,50T,50T
@@ -15541,14 +15624,14 @@ bc_dc_f:
 	db      50T,50T,50T,50T,50T,50T
 
 RPMRANGEbc_f2:
-	db      10T,20T,30T,40T,50T,70T   ; RPMRANGEbc[0-5]           ;* 84 Tuner Studio bcrpmBins2
+	db      10T,20T,30T,40T,50T,70T   ; RPMRANGEbc[0-5]           ;* 84 Tuner Studio bcrpmBins2 (N/A)
 TPSRANGEbc_f2:
-	db      51T,77T,102T,127T,179T,230T   ; TPSRANGEbc[0-5]       ;* 90 Tuner Studio bctpsBins2
+	db      51T,77T,102T,127T,179T,230T   ; TPSRANGEbc[0-5]       ;* 90 Tuner Studio bctpsBins2 (N/A)
 
 
 ; Second boost target table, switched over on input if selected.
 bc3_kpa_f:
-	db      100T,100T,100T,100T,100T,100T                         ;* 96 Tuner Studio bcBins3
+	db      100T,100T,100T,100T,100T,100T                         ;* 96 Tuner Studio bcBins3   (N/A)
 	db      100T,120T,120T,120T,120T,120T
 	db      100T,120T,120T,120T,120T,120T
 	db      100T,120T,120T,120T,120T,120T
@@ -15556,9 +15639,9 @@ bc3_kpa_f:
 	db      100T,120T,120T,120T,120T,120T
 
 RPMRANGE3bc_f:
-	db      10T,20T,30T,40T,50T,70T   ; RPMRANGE2bc[0-5]         ;* 132 Tuner Studio bcrpmBins3
+	db      10T,20T,30T,40T,50T,70T   ; RPMRANGE2bc[0-5]         ;* 132 Tuner Studio bcrpmBins3 (N/A)
 TPSRANGE3bc_f:
-        db      51T,77T,102T,127T,179T,230T   ; TPSRANGE2bc[0-5] ;* 138 Tuner Studio bctpsBins3
+        db      51T,77T,102T,127T,179T,230T   ; TPSRANGE2bc[0-5] ;* 138 Tuner Studio bctpsBins3 (N/A)
 
 
 flash_table7_end:
@@ -15566,47 +15649,46 @@ flash_table7_end:
 
                 org     $E800
 flash_table8:                                                                            ;* Tuner Studio Page 9
-idle_dc_lo	      db      50T	; Idle duty cycle at lower temp for 2-wire               ;* 0 Tuner Studio idle_dc_lo
+idle_dc_lo	      db      50T	; Idle duty cycle at lower temp for 2-wire               ;* 0 Tuner Studio idle_dc_lo (= %00110010, $32, 50T)
 				                ; Fielding Idle control *1  MIn = 0 Max = 100
-idlePeriod_f	  db      25T	; idle period in ignition events                         ;* 1 Tuner Studio idleperiod
+idlePeriod_f	  db      25T	; idle period in ignition events                         ;* 1 Tuner Studio idleperiod (N/A)
 ;idlekickrpm_f	  db      07T	; low rpm to trigger kick up of pwm idle duty
 ;idlekickdc_f	  db      55T	; default duty cycle
-idlecrankdc_f	  db      50T	; cranking idle dc kg                                    ;* 2 Tuner Studio idlecrankdc
-idledelayclock_f  db	  01T	; idle dashpot settling delay kg                         ;* 3 Tuner Studio idledelayclock
+idlecrankdc_f	  db      50T	; cranking idle dc kg                                    ;* 2 Tuner Studio idlecrankdc (= %00110010, $32, 50T
+idledelayclock_f  db	  01T	; idle dashpot settling delay kg                         ;* 3 Tuner Studio idledelayclock (N/A
 
-idledashdc_f	  db      45T	; dashpot default duty                                   ;* 4 Tuner Studio idledashdc
-idlemindc_f       db      27T	; minimum duty cycle                                     ;* 5 Tuner Studio idlemindc
-
-idle_dc_hi        db      00T   ; rmd Idle duty cycle at upper temp for 2-wire (warmup)  ;* 6 Tuner Studio idle_dc_hi
+idledashdc_f	  db      45T	; dashpot default duty                                   ;* 4 Tuner Studio idledashdc (N/A)
+idlemindc_f       db      27T	; minimum duty cycle                                     ;* 5 Tuner Studio idlemindc  (N/A)
+idle_dc_hi        db      00T   ; rmd Idle duty cycle at upper temp for 2-wire (warmup)  ;* 6 Tuner Studio idle_dc_hi (= %00000000, $0, 0T))
 ;idlekpa1_f        db      100T  ; rmd
 ;idlekpa2_f        db      100T  ; rmd
 ;ikpamin1_f        db      30T   ; rmd
 ;ikpamin2_f        db      30T   ; rmd
-ictlrpm1_f        db      3T	; idle deviation rpmx10 kg                               ;* 7 Tuner Studio ict1rpm1 
-ictlrpm2_f        db      10T	; idle deviation rpmx10 kg                               ;* 8 Tuner Studio ict1rpm2
-Ideadbnd_f        db      03T	; idle deadband range kg                                 ;* 9 Tuner Studio Ideadbnd
-Idashdelay_f      db      0T	; AIC closure delay ign events kg                        ;* 10 Tuner Studio Idashdelay
-idlefreq_f        db      100T  ; rmd                                                    ;* 11 Tuner Studio idlefreq
+ictlrpm1_f        db      3T	; idle deviation rpmx10 kg                               ;* 7 Tuner Studio ict1rpm1    (N/A) 
+ictlrpm2_f        db      10T	; idle deviation rpmx10 kg                               ;* 8 Tuner Studio ict1rpm2    (N/A)
+Ideadbnd_f        db      03T	; idle deadband range kg                                 ;* 9 Tuner Studio Ideadbnd    (N/A)
+Idashdelay_f      db      0T	; AIC closure delay ign events kg                        ;* 10 Tuner Studio Idashdelay (N/A)
+idlefreq_f        db      100T  ; rmd                                                    ;* 11 Tuner Studio idlefreq   (= %01100100, $64, 100T))
 ;delay2rpm_f       db      20T   ; rmd
-idlestartclk_f    db      10T	; startup decay timer ign events kg                      ;* 12 Tuner Studio idlestartclk
-idlePeriod2_f     db      10T   ; rmd                                                    ;* 13 Tuner Studio idlePeriod2
-irestorerpm_f     db      15T   ; rmd                                                    ;* 14 Tuner Studio irestorerpm
-idleclosedc_f     db      0T    ; rmd (015)                                              ;* 15 Tuner Studio idleclosedc
+idlestartclk_f    db      10T	; startup decay timer ign events kg                      ;* 12 Tuner Studio idlestartclk (N/A)
+idlePeriod2_f     db      10T   ; rmd                                                    ;* 13 Tuner Studio idlePeriod2  (N/A)
+irestorerpm_f     db      15T   ; rmd                                                    ;* 14 Tuner Studio irestorerpm  (N/A)
+idleclosedc_f     db      0T    ; rmd (015)                                              ;* 15 Tuner Studio idleclosedc  (N/A)
 
-feature13_f       db      2T                                                             ;* 16 Tuner Studio ?????
-PWMidleb          equ     $01   ; pwm idle on vs B&G on/off                              ;* Tuner Studio pwmIdle bit0
-idle_warmupb      equ     $02   ; pwm idle warmup open loop                              ;* Tuner Studio pwmidlewhen bit1
-idle_clb          equ     $04   ; pwm idle closed loop                                   ;* Tuner Studio pwmidlewhen bit2
-cltMAPb:          equ     $08   ; Use Correction table in the Air Density factor         ;* Tuner Studio IATcor bit3
-CltMATCheckb:     equ     $10   ; Correction table MAT or IAT based                      ;* Tuner Studio IATCorTy bit4
+feature13_f       db      2T                                                             ;* 16 Tuner Studio ?????         (= %00000010, $2, 2T)
+PWMidleb          equ     $01   ; pwm idle on vs B&G on/off                              ;* Tuner Studio pwmIdle bit0     (= 1 PWM idle)
+idle_warmupb      equ     $02   ; pwm idle warmup open loop                              ;* Tuner Studio pwmidlewhen bit1 (= 1 warmup only)
+idle_clb          equ     $04   ; pwm idle closed loop                                   ;* Tuner Studio pwmidlewhen bit2 (= 0 open loop)
+cltMAPb:          equ     $08   ; Use Correction table in the Air Density factor         ;* Tuner Studio IATcor bit3      (= 0 normal IAT)
+CltMATCheckb:     equ     $10   ; Correction table MAT or IAT based                      ;* Tuner Studio IATCorTy bit4    (= 0 MAT corrected)
 
-FASTIDLEtemp_f	  db      105T	; Feilding 2-Wire Idle control Fast Idle                 ;* 17 Tuner Studio fastIdleTemp 
+FASTIDLEtemp_f	  db      105T	; Feilding 2-Wire Idle control Fast Idle                 ;* 17 Tuner Studio fastIdleTemp  (= %01101001, $69, 105T) 
 				                ; lower temperature F -40
-slowIdleTemp_f	  db      234T	; Feilding 2-Wire Idle control Slow Idle                 ;* 18 Tuner Studio slowIdleTemp
+slowIdleTemp_f	  db      234T	; Feilding 2-Wire Idle control Slow Idle                 ;* 18 Tuner Studio slowIdleTemp  (= %11001000, $C8, 200T)
 				                ; upper temperature F -40
-fastIdle_f	      db      110T	; Fast Idle RPM (RPM*10 100-2550 rpm range)              ;* 19 Tuner Studio fastIdleRPM
-slowIdle_f	      db       65T	; Slow Idle RPM (RPM*10 100-2550 rpm range)              ;* 20 Tuner Studio slowIdleRPM
-idleThresh_f	  db       30T	; TPS Raw value for Idle mode to kick in.                ;* 21 Tuner Studio idleThresh                                              
+fastIdle_f	      db      110T	; Fast Idle RPM (RPM*10 100-2550 rpm range)              ;* 19 Tuner Studio fastIdleRPM  (N/A)
+slowIdle_f	      db       65T	; Slow Idle RPM (RPM*10 100-2550 rpm range)              ;* 20 Tuner Studio slowIdleRPM  (N/A)
+idleThresh_f	  db       30T	; TPS Raw value for Idle mode to kick in.                ;* 21 Tuner Studio idleThresh   (N/A)                                              
 
 WWU_f1
 	db      180T	; WWU (-40 F) (22)                                                   ;* 22 Tuner Studio wueBins9
@@ -15635,44 +15717,44 @@ CrankPWs_f:
 	db      35T	; 130F                                                                   ;* 40 Tuner Studio CrankPWT9
 	db      30T	; 160F                                                                   ;* 41 Tuner Studio CrankPWT10
 
-feature11_f4    db  %00010000       ; (42)                                                  ;* 42 Tuner Studio ?????
-AlwaysPrimeb:   equ     1    ; Only fire pump if Prime pulse ON | Prime pump every time     ;* Tuner Studio AlwaysPrime bit0
-PrimeLateb      equ     2    ; Fire prime pulse after 2 seconds                             ;* Tuner Studio PrimeLate bit1
-PrimeTwiceb     equ     4    ; Fire the Prime Pulses Twice                                  ;* Tuner Studio PrimeLate bit2
-NoPrimePb:      equ     8    ; Use Priming Table or Use Prime Pulse                         ;* Tuner Studio PrimeTBox bit3
-cltcrankb:      equ     $10  ; use coolant temp for crank pulsewidth                        ;* Tuner Studio crankpwip bit4
-matcrankb:      equ     $20  ; use inlet air temp for crank pulsewidth. Both means average  ;* Tuner Studio crankpwip bit5
-ExCrFuelb:      equ     $40  ; Look at TPS to see if we trigger extra fuel during cranking? ;* Tuner Studio ExFuelCrank bit6
+feature11_f4    db  %00010000       ; (42)                                                  ;* 42 Tuner Studio ????? (=%00010001, $11, 17T)
+AlwaysPrimeb:   equ     1    ; Only fire pump if Prime pulse ON | Prime pump every time     ;* Tuner Studio AlwaysPrime bit0 (= 1 always)
+PrimeLateb      equ     2    ; Fire prime pulse after 2 seconds                             ;* Tuner Studio PrimeLate bit1   (= 0 power up)
+PrimeTwiceb     equ     4    ; Fire the Prime Pulses Twice                                  ;* Tuner Studio PrimeLate bit2   (= 0 power up) 
+NoPrimePb:      equ     8    ; Use Priming Table or Use Prime Pulse                         ;* Tuner Studio PrimeTBox bit3   (= 0 prime table)
+cltcrankb:      equ     $10  ; use coolant temp for crank pulsewidth                        ;* Tuner Studio crankpwip bit4   (= 1 clt only) 
+matcrankb:      equ     $20  ; use inlet air temp for crank pulsewidth. Both means average  ;* Tuner Studio crankpwip bit5   (= 0 )
+ExCrFuelb:      equ     $40  ; Look at TPS to see if we trigger extra fuel during cranking? ;* Tuner Studio ExFuelCrank bit6 (= 0 no extra fuel crank)
 
 CrankRPM_f	    db      $03	 ; Maximum RPM for cranking (rpm*100)                        ;* 43 Tuner Studio CrankRPM
-tpsflood_f	    db      $B2	 ; Throttle position for floodclear mode in RAW ADC          ;* 44 Tuner Studio tpsflood
-primePulse_f    db      04T  ; prime pulse if not using table (feature11_f4 $8) *023     ;* 45 Tuner Studio PrimePulse
-ExtraCrFu_f     db      00T  ; Extra cranking fuel multiplier (feature11_f4 $40) (46)    ;* 46 Tuner Studio ExtraFMult
+tpsflood_f	    db      $B2	 ; Throttle position for floodclear mode in RAW ADC          ;* 44 Tuner Studio tpsflood ( = 243T)
+primePulse_f    db      04T  ; prime pulse if not using table (feature11_f4 $8) *023     ;* 45 Tuner Studio PrimePulse  (N/A)
+ExtraCrFu_f     db      00T  ; Extra cranking fuel multiplier (feature11_f4 $40) (46)    ;* 46 Tuner Studio ExtraFMult  (N/A)
 
 cltMATcorr_f:                   
-                db      100T ; 7 positions for CLT related correction to          (47)   ;* 47 Tuner Studio IATCorS
-                db      98T  ; IAT Air Density Correction 110 = correction * 110%        ;* 48 NOT USED
-                db      96T                                                              ;* 49 NOT USED
-                db      94T                                                              ;* 50 NOT USED
-                db      92T                                                              ;* 51 NOT USED
-                db      90T                                                              ;* 52 NOT USED
-                db      88T  ; (53)                                                      ;* 53 NOT USED
+                db      100T ; 7 positions for CLT related correction to          (47)   ;* 47 Tuner Studio IATCorS  (N/A)
+                db      98T  ; IAT Air Density Correction 110 = correction * 110%        ;* 48 NOT USED              (N/A)
+                db      96T                                                              ;* 49 NOT USED              (N/A)
+                db      94T                                                              ;* 50 NOT USED              (N/A)
+                db      92T                                                              ;* 51 NOT USED              (N/A)
+                db      90T                                                              ;* 52 NOT USED              (N/A)
+                db      88T  ; (53)                                                      ;* 53 NOT USED              (N/A)
 
-RPMReduLo_f     db      10T  ; lowest rpm to reduce correction by (54)                   ;* 54 Tuner Studio RPMRedLo
-RPMReduHi_f     db      30T  ; Highest rpm when correction is back to normal             ;* 55 Tuner Studio RPMRedHi
+RPMReduLo_f     db      10T  ; lowest rpm to reduce correction by (54)                   ;* 54 Tuner Studio RPMRedLo (N/A)
+RPMReduHi_f     db      30T  ; Highest rpm when correction is back to normal             ;* 55 Tuner Studio RPMRedHi (N/A)
 
 CltMATRange:
-    db      200T    ; 160F   User defined Temp settings for Clt Related Air Dens (56)    ;* 56 Tuner Studio IATCTemp
-    db      207T    ; etc.                                                               ;* 57 NOT USED 
-    db      216T    ;                                                                    ;* 58 NOT USED
-    db      225T    ;                                                                    ;* 59 NOT USED
-    db      234T    ;                                                                    ;* 60 NOT USED
-    db      243T    ;                                                                    ;* 61 NOT USED
-    db      252T    ; 212F (62)                                                          ;* 62 NOT USED
+    db      200T    ; 160F   User defined Temp settings for Clt Related Air Dens (56)    ;* 56 Tuner Studio IATCTemp (N/A)
+    db      207T    ; etc.                                                               ;* 57 NOT USED              (N/A) 
+    db      216T    ;                                                                    ;* 58 NOT USED              (N/A)
+    db      225T    ;                                                                    ;* 59 NOT USED              (N/A)
+    db      234T    ;                                                                    ;* 60 NOT USED              (N/A)
+    db      243T    ;                                                                    ;* 61 NOT USED              (N/A)
+    db      252T    ; 212F (62)                                                          ;* 62 NOT USED              (N/A)
 
 ;rotary leading trailing split timing 6x6 table
 split_f:   ; (63)
-	db      29T,88T,88T,88T,88T,88T                                                      ;* 63 Tuner Studio splitTable
+	db      29T,88T,88T,88T,88T,88T                                                      ;* 63 Tuner Studio splitTable (N/A)
 	db      29T,73T,73T,73T,73T,73T
 	db      29T,58T,58T,58T,58T,58T
 	db      29T,43T,43T,43T,43T,43T
@@ -15680,13 +15762,13 @@ split_f:   ; (63)
 	db      25T,25T,25T,25T,25T,25T
 
 RPMRANGEsplit_f: ;(99)
-	db      6T,8T,30T,40T,50T,70T       ; RPMRANGE2bc[0-5]                               ;* 99 Tuner Studio splitrpmBins
+	db      6T,8T,30T,40T,50T,70T       ; RPMRANGE2bc[0-5]                               ;* 99 Tuner Studio splitrpmBins  (N/A)
 KPARANGEsplit_f: ;(105)
-    db      40T,50T,60T,80T,105T,106T   ; TPSRANGE2bc[0-5]                               ;* 105 Tuner Studio splitkpaBins
-p8feat1_f:        db      0T            ; a page8 config byte (111)                      ;* 111 Tuner Studio rotary2
+    db      40T,50T,60T,80T,105T,106T   ; TPSRANGE2bc[0-5]                               ;* 105 Tuner Studio splitkpaBins (N/A)
+p8feat1_f:        db      0T            ; a page8 config byte (111)                      ;* 111 Tuner Studio rotary2      (N/A)
 rotary2b          equ     1             ; enable/disable twin rotor mode for BIT
 
-fixedsplit_f:     db      0T            ; fixed split for testing like Fixed in spark (112)  ;* 112 Tuner Studio fixedsplit
+fixedsplit_f:     db      0T            ; fixed split for testing like Fixed in spark (112)  ;* 112 Tuner Studio fixedsplit (N/A)
 
 
 flash_table8_end:
