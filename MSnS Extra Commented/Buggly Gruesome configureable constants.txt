@@ -12,9 +12,7 @@ personality_f   db      %00000001	; Only 1 allowed to be set unless in      ;* 0
 ;MSNS           equ      1    Megasquirtnspark                                ;* Tuner Studio msnsCyl bit0   (= 0)
 ;MSNEON         equ      2    MS neon decoder                                 ;* Tuner Studio neonCrank bit1 (= 0)
 ;WHEEL          equ      4    generalised decoder 36-1, 60-2 etc              ;* Tuner Studio wheelon bit2   (= 1 wheel) 
-
 ;WHEEL2         equ      8    If in WHEEL mode then WHEEL2 is 0 = -1  1 = -2  ;* Tuner Studio onetwo bit3    (= 0)
-
 ;EDIS           equ      $10  edis                                            ;* Tuner Studio edis bit4      (= 0)
 ;DUALEDIS       equ      $20  if in EDIS mode then this allows two edis       ;* Tuner Studio edis bit5      (= 0)
 ;                             modules (for edis4 on V8, edis6 on V12)
