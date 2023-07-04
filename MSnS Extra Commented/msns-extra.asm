@@ -6907,7 +6907,7 @@ bc2_STEP_3:
 
 $MACRO TurnAllSpkOff			; gets called in stall or on entering bootloader mode
    					            ; turn spark outputs to inactive
-  brclr  invspk,EnhancedBits4,soin  ;* invspk = 1
+  brclr  invspk,EnhancedBits4,soin                                          ;* invspk = 1
   
 ; inverting easy, just put all to zero
 
@@ -6918,7 +6918,7 @@ $MACRO TurnAllSpkOff			; gets called in stall or on entering bootloader mode
   bclr   Output3,portd
   bclr   pin10,portc
   bclr   KnockIn,portd
-  bra    soin_done
+  bra    soin_done                                                          ;* GO TO LINE 6972
   
 soin:   ; non inv
 
@@ -6969,7 +6969,7 @@ soin10:
   bset   KnockIn,portd
   
 soin11:
-soin_done:
+soin_done:                                                             ;* LINE 6972
 
 ; kill the dwell timers too just in case
   clr    SparkOnLeftah
@@ -8345,7 +8345,7 @@ $MACROEND
 **
 ***************************************************************************
 
-$MACRO CalcDwellspk
+$MACRO CalcDwellspk                                                                       ;* LINE 8348
 ; This is now one massive macro. There is a section of code depending on how many spark
 ; outputs there are - 1,2,3,4,5,6
 ; 022g - macro is now used to apply dwelldelay value calculated in main loop.
@@ -9513,8 +9513,8 @@ dodwell:
 
   lda    SparkCutCnt	                ; Check Spark Counter
   inca
-  cmp    SparkCutBase_f	                ; How many sparks to count to
-  blo    Dont_ResetCnt
+  cmp    SparkCutBase_f	                ; How many sparks to count to   ;* SparkCutBase = 5T (default)(Rev limit, Launch, Boost not used)
+  blo    Dont_ResetCnt                                                  ;* IF (A)<(M) Branch
   lda     #01T
   
 Dont_ResetCnt:
@@ -9526,8 +9526,8 @@ Dont_ResetCnt:
 blssd:                                                                          ;* LINE 9526
   bra    lsspk_done                                                             ;* GO TO LINE 9532 
   
-lsspk_inv:
-        COILNEG				            ; charge coil for inverted
+lsspk_inv:                                                                      ;* LINE 9529
+        COILNEG				            ; charge coil for inverted              ;* MACRO AT LINE 8172
 		
 lsspk_done:                                                                     ;* LINE 9532
   mov    SparkCarry,coilsel; put it back as we found it
@@ -9543,9 +9543,9 @@ CHECK_SPARK_LATE:
 ; hopefully this will not be a problem
 
   brset  cant_crank,EnhancedBits2,timebased
-  lda    SparkConfig1_f		; check if noninv or inv spark
-  bit    #M_SC1TimCrnk		; Check if spark on time or IRQ return (SparkConfig1 already in A)
-  beq    IRQ_SPARK
+  lda    SparkConfig1_f		; check if noninv or inv spark                                       ;* SparkConfig1_f = %00001000
+  bit    #M_SC1TimCrnk		; Check if spark on time or IRQ return (SparkConfig1 already in A)   ;* M_SC1TimCrnk = 0
+  beq    IRQ_SPARK                                                                               ;* GO TO LINE 9564
 
 timebased:   ; Check if time for spark
   lda    rpmch
@@ -9561,9 +9561,9 @@ jINJ_FIRE_CTL:				; convenient place to branch to
   jmp    INJ_FIRE_CTL
 ;**
 
-IRQ_SPARK:
-  brset  MSNEON,personality,irq_spark_neon  ;* MSNEON = 0
-  brset  WHEEL,personality,irq_spark_neon   ;* Wheel = 1 go to line 9581
+IRQ_SPARK:                                                                            ;* lINE 9564
+  brset  MSNEON,personality,irq_spark_neon                                            ;* MSNEON = 0
+  brset  WHEEL,personality,irq_spark_neon                                             ;* Wheel = 1 go to line 9581
   bil    jINJ_FIRE_CTL		                ; IRQ still low? then skip
 
 ChkHold:
@@ -9578,21 +9578,21 @@ ChkHold:
 ; This will not work with wheel decoder, need to use a flag
 ; Treat end of third pulse as trigger return
 
-irq_spark_neon:
+irq_spark_neon:                                                                        ;* LINE 9581
   brclr  trigret,SparkBits,jINJ_FIRE_CTL
   bclr   trigret,SparkBits	             ; clear it now
   bclr   sparktrigg,sparkbits	         ; No more sparks for this IRQ
 
 DoSparkLSpeed:
   bset   sparkon,revlimbits	; spark now on
-  brset  invspk,EnhancedBits4,dosls_inv    ;* invspk = 1, go to line 9594
+  brset  invspk,EnhancedBits4,dosls_inv                                                ;* invspk = 1, go to line 9594
   
     COILNEG				; macro = fire coil for non-inverted
 	
   bra    dosls_done
   
 dosls_inv:
-    COILPOS				; macro = fire coil for inverted
+    COILPOS				; macro = fire coil for inverted                               ;* MACRO AT LINE 8261
 	
 dosls_done:
 
@@ -9604,7 +9604,7 @@ dosls_done:
   bra    dosls_cd
   
 b_INJFC2:
-  jmp    INJ_FIRE_CTL   ;* go to line 9681
+  jmp    INJ_FIRE_CTL                                                                ;* GO TO LINE  9681
   
 dosls_fd:
 
@@ -9678,7 +9678,7 @@ tfiof:
   bclr   iasc,porta
 ;  bra    INJ_FIRE_CTL
 
-INJ_FIRE_CTL:
+INJ_FIRE_CTL:                                                                    ;* LINE 9681
 
 ;======== Injector Firing Control ========
 ;===== Main Injector Control Logic =======
@@ -9688,10 +9688,10 @@ INJ_FIRE_CTL:
 INJF1:
   brset   sched2,squirt,NEW_SQUIRT2
   
-INJF2:
+INJF2:                                                                         ;* LINE 9691
   brset   firing1,squirt,CHK_DONE_1
   
-INJF3:
+INJF3:                                                                         ;* LINE 9694
   brset   firing2,squirt,CHK_DONE_2JMP
   jmp     inj2done
 
@@ -9702,12 +9702,12 @@ NEW_SQUIRT1:
   bclr    sched1,squirt		          ; Turn off schedule bit (is now current operation)
   bset    inj1,squirt
   clr     pwrun1
-  brset   REUSE_LED17,outputpins,nsq1   ;* REUSE_LED17 = 1, go to line 9708 
+  brset   REUSE_LED17,outputpins,nsq1                                        ;* REUSE_LED17 = 1, GO TO LINE 9708 
   bset    sled,portc		          ; squrt LED is ON
   
-nsq1:
+nsq1:                                                                        ;* LINE 9708
   mov    #$00,T1CH0H
-  lda    INJPWM_f1
+  lda    INJPWM_f1                                                           ;* INJPWM_f1 = 75T (DEFAULT)
   sta    T1CH0L
   bset	 7,PORTA		              ; ** Flyback Damper - turn on X0 for Inj1
   
@@ -9722,30 +9722,30 @@ NEW_SQUIRT2:
   bclr   sched2,squirt		          ; Turn off schedule bit (is now current operation)
   bset   inj2,squirt
   clr    pwrun2
-  brset  REUSE_LED17,outputpins,nsq2   ;* REUSE_LED17 = 1, go to line 9728 
+  brset  REUSE_LED17,outputpins,nsq2                                          ;* REUSE_LED17 = 1, go to line 9728 
   bset   sled,portc		              ; squrt LED is ON
   
-nsq2:
+nsq2:                                                                         ;* LINE 9728
   mov    #$00,T1CH1H
-  lda    DTmode_f                      ;* DTmode_f = %01100001
-  bit    #alt_i2t2                     ;* alt_i2t2 = 0
-  beq    nsq2single                    ;* go to line 9736
+  lda    DTmode_f                                                             ;* DTmode_f = %01100001
+  bit    #alt_i2t2                                                            ;* alt_i2t2 = 0
+  beq    nsq2single                                                           ;* GO TO LINE 9736
   lda    INJPWM_f2
   bra    nsq2cont
   
-nsq2single:
-  lda    INJPWM_f1
+nsq2single:                                                                   ;* LINE 9736
+  lda    INJPWM_f1                                                            ;* INJPWM_f1 = 75T (DEFAULT)
   
 nsq2cont:
   sta    T1CH1L
   bset   6,PORTA		             ; ** Flyback Damper - turn on X1 for Injector 2
   bclr   inject2,portd		         ; ^* * * Turn on Injector #2 (inverted drive)
   lda    feature3_f
-  bit    #WaterInjb                  ;* WaterInjb = 0
-  beq    INJF2                       ;* go to line 9691 
+  bit    #WaterInjb                                                          ;* WaterInjb = 0
+  beq    INJF2                                                               ;* GO TO LINE 9691 
 ;  brclr   WaterInj,feature3,INJF2
-  brset  water,porta,inject_water	; If water needed go to inject water
-  bra	 INJF2
+  brset  water,porta,inject_water	; If water needed go to inject water     ;* water = 0
+  bra	 INJF2                                                               ;* GO TO LINE 9691 
 	  
 inject_water:
   brset  Nitrous,feature1,INJF2	    ; If NOS Selected dont turn on water pulsed output
@@ -9761,17 +9761,17 @@ CHK_DONE_1:
   inc     pwrun1
   lda     pwrun1
   cmp     pw1
-  beq     OFF_INJ_1
-  brset	  crank,engine,INJF3	    ; do not perform PWM limiting when cranking
+  beq     OFF_INJ_1                                                              ;* IF pwrun1 = pw1 GO TO LINE 9774
+  brset	  crank,engine,INJF3	    ; do not perform PWM limiting when cranking  ;* GO TO LINE 9694
   lda     pwrun1
-  cmp     INJPWMT_f1
+  cmp     INJPWMT_f1                                                             ;* INJPWMT_f1 = 255T (DEFAULT)
   beq     PWM_LIMIT_1
-  bra	 INJF3
+  bra	 INJF3                                                                   ;* GO TO LINE  9694
   
 CHK_DONE_2JMP:
   bra    CHK_DONE_2		            ; Jump added
   
-OFF_INJ_1:
+OFF_INJ_1:                                                                       ;* LINE 9774
   bclr    firing1,squirt
   bclr    sched1,squirt
   bclr    inj1,squirt
@@ -9781,7 +9781,7 @@ OFF_INJ_1:
   mov     #t1scx_NO_PWM,T1SC0
   mov     #Timergo_NO_INT,T1SC
 ;  bra     INJF3
-  jmp     INJF3
+  jmp     INJF3                                                                   ;* GO TO LINE  9694
   
 PWM_LIMIT_1:
   mov     #T1Timerstop,T1SC
@@ -9796,7 +9796,7 @@ CHK_DONE_2:
   inc    pwrun2
   lda    pwrun2
   cmp    pw2
-  beq    OFF_INJ_2
+  beq    OFF_INJ_2                                                              ;* IF pwrun2 = pw2 GO TO LINE 9819
 ;  brset  crank,engine,CHECK_RPM	; do not perform PWM limiting when cranking
   brclr	 crank,engine,CKDN2
   jmp    CHECK_RPM
@@ -9816,31 +9816,31 @@ ckd2single:
   beq    PWM_LIMIT_2
   bra	 inj2done
 
-OFF_INJ_2:
+OFF_INJ_2:                                                                       ;* LINE 9819
   bclr   firing2,squirt
   bclr   sched2,squirt
   bclr   inj2,squirt
   bclr	 6,PORTA		            ; ** Flyback Damper - turn off X1 (for Inj 2)
   bset   inject2,portd		        ; ^* * * Turn Off Injector #2 (inverted drive)
-  lda    feature3_f
-  bit    #WaterInjb
-  beq    Dont_Clr_Water2
+  lda    feature3_f                                                                 ;* feature3_f = %10000001 
+  bit    #WaterInjb                                                                 ;* WaterInjb = 0
+  beq    Dont_Clr_Water2                                                            ;* GO TO LINE 9831
 ;  brclr   WaterInj,feature3,Dont_Clr_Water2	; if not using water then skip
   bclr    water2,porta		       ; Turn off water injection pulse
   
-Dont_Clr_Water2:
+Dont_Clr_Water2:                                                                    ;* LINE 9831
   mov    #T1Timerstop,T1SC
   mov    #t1scx_NO_PWM,T1SC1
   mov    #Timergo_NO_INT,T1SC
-  bra    inj2done
+  bra    inj2done                                                                   ;* GO TO LINE 9842
   
 PWM_LIMIT_2:
   mov    #T1Timerstop,T1SC
   mov    #T1SCX_PWM,T1SC1
   mov    #Timergo_NO_INT,T1SC
 
-inj2done:
-  brset  REUSE_FIDLE,outputpins,idleActDone  ;* REUSE_IDLE = 0
+inj2done:                                                                          ;* LINE 9842
+  brset  REUSE_FIDLE,outputpins,idleActDone                                        ;* REUSE_IDLE = 0
 
 *****************************************************************************
 ** Idle Control PWM Actuator
@@ -9851,8 +9851,8 @@ inj2done:
 idleActuator:
   brset  crank,engine,idleActOn	    ; if cranking then keep it shut (rmd changed from off to on)
   brclr  running,engine,idleActOff	; if not running then close it
-  lda    feature13_f 	            ; skip if on/off mode
-  bit    #pwmidleb                  ;* pwmidleb = 1
+  lda    feature13_f 	            ; skip if on/off mode                    ;* feature13_f = %00000011
+  bit    #pwmidleb                                                           ;* pwmidleb = 1
   beq    idleActCheck
   inc    idleActClock		        ; Adjust idle PWM count
   lda    idleActClock
@@ -9864,7 +9864,7 @@ idleActCheck:
   lda    idleDC
   cmp    #0T
   beq    idleActOff
-  cmp    idlefreq_f  ; #255T KG   ;* idlefreq_f = 100T
+  cmp    idlefreq_f  ; #255T KG                                              ;* idlefreq_f = 100T
   beq    idleActOn
   cmp    idleActClock
   bls    idleActOff
@@ -9889,7 +9889,7 @@ idleActDone:
 **  can invert the output to reverse the sense
 *****************************************************************************
 
-  brclr  BoostControl,feature2,doneBoostControl   ;* BoostControl = 0, go to line 9921
+  brclr  BoostControl,feature2,doneBoostControl                             ;* BoostControl = 0, go to line 9921
   
 doBoostControl:
   lda    bcDC
@@ -9918,18 +9918,18 @@ bcSetout:
 bcClrout:
   bclr   boostP,porta
 
-doneBoostControl:
+doneBoostControl:                                                            ;* LINE 9921
 
 ;=======Check RPM Section=====
 
 CHECK_RPM:
-  brclr  running,engine,b_ENABLE               ; Branch if not running right now
-  brset  firing1,squirt,CHK_RE_ENABLE
-  brset  firing2,squirt,CHK_RE_ENABLE
-  brset  REUSE_LED17,outputpins,CHK_RE_ENABLE  ;* REUSE_LED17 = 1, go to line 9932 
+  brclr  running,engine,b_ENABLE               ; Branch if not running right now  ;* IF running = 0, GO TO LINE 9943
+  brset  firing1,squirt,CHK_RE_ENABLE                                             ;* IF firing1 = 1 GO TO LINE 9932 
+  brset  firing2,squirt,CHK_RE_ENABLE                                             ;* IF firing2 = 1 GO TO LINE 9932
+  brset  REUSE_LED17,outputpins,CHK_RE_ENABLE                                     ;* REUSE_LED17 = 1, go to line 9932 
   bclr   sled,portc		                       ; squrt LED is OFF - nothing is injecting
 
-CHK_RE_ENABLE:
+CHK_RE_ENABLE:                                                                    ;* LINE 9932
 
 ;====== Check for re-enabling of IRQ input pulses
 
@@ -9937,11 +9937,11 @@ CHK_RE_ENABLE:
   beq    RPMLOWBYTECHK	; If zero go ahead check for half interval
   lda    rpmcl			; Check current rpm interval
   cmp    #128T			; 12.8 milliseconds is maximum (JSM changed this and cause 'stumble')
-  beq    REARM_IRQ		; time to re-arm IRQ
-  bra    INCRPMER		; Jump around rpm half interval check
+  beq    REARM_IRQ		; time to re-arm IRQ                                                     ;* GO TO LINE 9952
+  bra    INCRPMER		; Jump around rpm half interval check                                    ;* GO TO LINE 10002 
 
-b_ENABLE:
-  jmp    ENABLE_THE_IRQ
+b_ENABLE:                                                                                        ;* LINE 9943
+  jmp    ENABLE_THE_IRQ                                                                          ;* GO TO LINE 10071 
 
 RPMLOWBYTECHK:
   lda	 rpmpl			; Load in the latched previous RPM value
@@ -9949,19 +9949,19 @@ RPMLOWBYTECHK:
   cmp	 rpmcl			; Is it the same value as current RPM Counter?
   bne	 INCRPMER		; If not then jump around this
 
-REARM_IRQ:
+REARM_IRQ:                                                                                       ;* LINE 9952
 
 ; Also do tacho output in here to give 50% output duty
 
-  lda    tachconf_f   ;* tachconf = 4T
-  and    #$7f
-  beq    CHK_REARM
+  lda    tachconf_f                                                     ;* tachconf = 4T (%00000100)
+  and    #$7f                                                           ;* and            %01111111    
+  beq    CHK_REARM                                                      ;* Accu A =       %00000100
   
 ;tachoff:
   cbeqa  #1T,tachoff_x2
   cbeqa  #2T,tachoff_x3
   cbeqa  #3T,tachoff_x4
-  cbeqa  #4T,tachoff_x5   ;* go to line 9981
+  cbeqa  #4T,tachoff_x5                                                 ;* GO TO LINE 9981
   cbeqa  #5T,tachoff_out3
   cbeqa  #6T,tachoff_pin10
   bra    CHK_REARM
@@ -9978,9 +9978,9 @@ tachoff_x4:
   bclr   output1,porta
   bra    CHK_REARM
   
-tachoff_x5:
+tachoff_x5:                                                            ;* LINE 9981
   bclr   output2,porta
-  bra    CHK_REARM      ;* go to line 9993
+  bra    CHK_REARM                                                     ;* GO TO LINE 9993
   
 tachoff_out3:
   bclr   output3,portd
@@ -9990,7 +9990,7 @@ tachoff_pin10:
   bclr   pin10,portc
   bra    CHK_REARM
 
-CHK_REARM:
+CHK_REARM:                                                             ;* LINE 9993
   brset  MSNEON,personality,INCRPMER	; irq always on in Neon mode   ;* MSNEON = 0
   brset  WHEEL,personality,INCRPMER	    ; irq always on in Wheel mode  ;* Wheel = 1, go to line 10002
   lda    feature6_f
@@ -9999,28 +9999,28 @@ CHK_REARM:
   bset	 ACK,INTSCR		                ; clear out any latched interrupts
   bclr	 IMASK,INTSCR		            ; enable interrupts again for IRQ
 
-INCRPMER:
+INCRPMER:                                                                             ;* LINE 10002
   sei
   inc    rpmcl
-  bne    jCHECK_MMS
+  bne    jCHECK_MMS                                                                   ;* IF rpmcl NOT = 0 GO TO LINE 10015
   inc    rpmch
-  brclr  running,engine,jCHECK_MMS	            ; don't do stall check if not running
+  brclr  running,engine,jCHECK_MMS	            ; don't do stall check if not running ;* IF running = 0 GO TO LINE 10015
   lda    rpmch
-  brclr  cant_crank,EnhancedBits2,incrpm_crank	; if we've fully exited crank mode
+  brclr  cant_crank,EnhancedBits2,incrpm_crank	; if we've fully exited crank mode    ;* IF cant_crank = 0 GO TO LINE 10018
   cmp    #30T			                        ; then 0.75 seconds timeout (<360rpm on a 2cyl) (was 0.25s)
-  blo    jCHECK_MMS
+  blo    jCHECK_MMS                                                                   ;* IF rpmch < 30T GO TO LINE 10016
   cli				                            ; ok, we can be interrupted again
-  bra    stall
+  bra    stall                                                                        ;* ELSE GO TO LINE 10023
   
-jCHECK_MMS:
-  jmp    CHECK_MMS
+jCHECK_MMS:                                                                            ;* LINE 10015
+  jmp    CHECK_MMS                                                                     ;* GO TO LINE 10074
   
-incrpm_crank:
+incrpm_crank:                                                                          ;* LINE 10018
   cmp    #$64			       ; If RPMPH is 100 (or RPMPeriod = 2.5 sec) then engine stalled
   blo    jCHECK_MMS
   cli				           ; ok, we can be interrupted again
   
-stall:
+stall:                                                                                 ;* LINE 10023
   clr    engine			       ; Engine is stalled, clear all in engine
   bclr   fuelp,porta		   ; Turn off fuel Pump
   clr    rpmch
@@ -10038,26 +10038,26 @@ stall:
   clr    rpm
   bclr   cant_crank,EnhancedBits2	; if we stalled we can crank again
 
-    TurnAllSpkOff                   ; macro to turn off all spark outputs
+    TurnAllSpkOff                   ; macro to turn off all spark outputs  ;* MACRO AT LINE 6908
 
 stall_cont:
-  brset  EDIS,personality,pass_store  ;* EDIS = 0
-  lda    TriggAngle_f		        ; Calculate crank delay angle
-  sub    CrankAngle_f
+  brset  EDIS,personality,pass_store                                        ;* EDIS = 0
+  lda    TriggAngle_f		        ; Calculate crank delay angle           ;* TriggAngle_f = 255T (80 degrees) (255-28.4=226.6x.352=80 degrees)          
+  sub    CrankAngle_f                                                       ;* CrankAngle_f = 56T (10 degrees)
   add    #28T			            ; - -10 deg
   sta    DelayAngle
   
 pass_store:
-  lda    CrankAngle_f		        ; Update spark angle for user interface
+  lda    CrankAngle_f		        ; Update spark angle for user interface  ;* CrankAngle_f = 56T (10 degrees) (56-28.4=27.6x.352=10 degrees)
   sta    SparkAngle
-  lda    SparkHoldCyc_f		        ; Hold spark after stall
+  lda    SparkHoldCyc_f		        ; Hold spark after stall                 ;* SparkHoldCyc_f = 0
   sta    wheelcount		            ; (HoldSpark)
-  brset  MSNEON,personality,wc_wheel   ;* MSNEON = 0
-  brset  WHEEL,personality,wc_wheel    ;* Wheel = 1, go to line 10059
+  brset  MSNEON,personality,wc_wheel                                         ;* MSNEON = 0
+  brset  WHEEL,personality,wc_wheel                                          ;* Wheel = 1, go to line 10059
   bra    ENABLE_THE_IRQ
   
-wc_wheel:
-  mov    #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff  ;* WHEELINIT = %11000011, $C3, 195T
+wc_wheel:                                                                    ;* LINE 10059
+  mov    #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff         ;* WHEELINIT = %11000011, $C3, 195T (195-28.4=59 degrees)
   bclr   wsync,EnhancedBits6
   bset   whold,EnhancedBits6
   lda    #0
@@ -10068,10 +10068,10 @@ wc_wheel:
   bset   coilabit,coilsel
   bset   coilerr,RevLimBits
 
-ENABLE_THE_IRQ:
+ENABLE_THE_IRQ:                                                               ;* LINE 10071
   bclr	 IMASK,INTSCR		    ; Enable IRQ
 
-CHECK_MMS:
+CHECK_MMS:                                                                    ;* LINE 10074
   cli
   lda    mms
   cmp    #$09
@@ -10084,15 +10084,15 @@ CHECK_MMS:
 
 MSEC:
 ;  brset  egoIgnCount,feature1,No_Ego_mSec	; Are we using mSec for ego counter?
-  lda    feature14_f1
-  bit    #egoIgnCountb                     ;* egoIgnCountb = 1 (cycles)
-  bne    No_Ego_mSec                       ;* go to line 10092
+  lda    feature14_f1                                                              ;* feature14_f1 = %00000001
+  bit    #egoIgnCountb                                                             ;* egoIgnCountb = 1 (cycles)
+  bne    No_Ego_mSec                                                               ;* GO TO LINE 10092
   inc    egocount		                    ; Increment EGO step counter
 
-No_Ego_mSec:
+No_Ego_mSec:                                                                       ;* LINE 10092
   inc    ms			                        ; bump up millisec
   clr    mms
-  brclr  REUSE_LED18,outputpins,FIRE_ADC	; only do this if using as IRQ monitor  ;* REUSE_LED18 = 0, go to line 10106
+  brclr  REUSE_LED18,outputpins,FIRE_ADC	; only do this if using as IRQ monitor  ;* REUSE_LED18 = 0, GO TO LINE 10106
   brset  REUSE_LED18_2,outputpins,FIRE_ADC	; not if spark c
   bil    IRQ_LOW		                    ; Check if IRQ pin low
   bclr   wled,portc		                    ; Turn OFF IRQ led
@@ -10103,7 +10103,7 @@ IRQ_LOW:
   brset  WHEEL,personality,FIRE_ADC	        ; irrelevant
   bset   wled,portc		                    ; Turn ON IRQ led (in case of bouncing points or what ever)
 
-FIRE_ADC:
+FIRE_ADC:                                                                         ;* LINE 10106
 
 ; Fire off another ADC conversion, channel is pointed to by ADSEL
 
@@ -10131,13 +10131,13 @@ MSDONE:
   bra    end100th
 
 one00th:
-  brclr  Launch,portd,nol_timer		; Button is pressed so skip timer  ;* Launch = 0, go to line 10140
+  brclr  Launch,portd,nol_timer		; Button is pressed so skip timer  ;* Launch = 0, GO TO LINE 10140
   lda    n2olaunchdel
   beq    nol_timer                  ; already zero
   sub    #1
   sta    n2olaunchdel
   
-nol_timer:
+nol_timer:                                                             ;* LINE 10140
 
 ; do similar for nitrous fuel hold on
 
@@ -10164,22 +10164,22 @@ ONETENTH:
 ; see if need to restart tooth logger
 
   lda    page
-  cbeqa  #$F0,restart_F0
-  cbeqa  #$F1,restart_F1
-  bra    oneten_notlog
+  cbeqa  #$F0,restart_F0                                                  ;* IF page = #$F0 GO TO LINE 10171
+  cbeqa  #$F1,restart_F1                                                  ;* IF page = #$F1 GO TO LINE 10179
+  bra    oneten_notlog                                                    ;* ELSE GO TO LINE10187
 
-restart_F0:
-  brset  toothlog,EnhancedBits5,oneten_notlog
+restart_F0:                                                               ;* LINE 10171
+  brset  toothlog,EnhancedBits5,oneten_notlog                             ;* IF toothlog = 1 GO TO LINE 10187
   lda    txcnt
-  bne    oneten_notlog             ; if sending data then do not restart
+  bne    oneten_notlog             ; if sending data then do not restart  ;* IF txcnt NOT = 0 GO TO LINE 10187
   bset   toothlog,EnhancedBits5    ; turn logger back on (after send)
   bclr   triglog,EnhancedBits5     ; turn logger back on (after send)
   bra    oneten_notlog
 
-restart_F1:
-  brset  triglog,EnhancedBits5,oneten_notlog
+restart_F1:                                                               ;* LINE 10179
+  brset  triglog,EnhancedBits5,oneten_notlog                              ;* IF triglog = 1 GO TO LINE 10187
   lda    txcnt
-  bne    oneten_notlog             ; if sending data then do not restart
+  bne    oneten_notlog             ; if sending data then do not restart  ;* IF txcnt NOT = 0 GO TO LINE 10187
   bset   triglog,EnhancedBits5     ; turn logger back on (after send)
   bclr   toothlog,EnhancedBits5    ; turn logger back on (after send)
   bra    oneten_notlog
@@ -10199,17 +10199,17 @@ ST2Timer_zero:
   dec    VE3Timer
   
 VE3Timer_zero:
-  brset  UseVE3,EnhancedBits,No_VE3_delay	; Are we running from VE3?
+  brset  UseVE3,EnhancedBits,No_VE3_delay	; Are we running from VE3?        ;* UseVE3 = 0
   lda    VE3Delay_f
   sta    VE3Timer
   
 No_VE3_delay:
-  brclr  NosIn,portd,No_St2Delay
+  brclr  NosIn,portd,No_St2Delay                                              ;* NosIn = 0, GO TO LINE 10211
   lda    Spark2Delay_f		; If input not low reset ST2 delay timer
   sta    ST2Timer
   
-No_St2Delay:
-  brset  taeIgnCount,feature1,No_TPSCount   ;* taeIgnCount = 1 (cycles), go to line 10237
+No_St2Delay:                                                                  ;* LINE 10211
+  brset  taeIgnCount,feature1,No_TPSCount                                     ;* taeIgnCount = 1 (cycles), go to line 10237
   inc    tpsaclk
 
 ; Save current TPS reading in last_tps variable to compute TPSDOT
@@ -10234,7 +10234,7 @@ tps_dot_mode:
 Kpa_Dot_Mode:
   sta    TPSlast
 
-No_TPSCount:
+No_TPSCount:                                                             ;* LINE 2037
 
 ; Check Magnus rev limit times
 
@@ -10254,21 +10254,21 @@ TimeLeft:
 ****************************************************************************
 SECONDS:
   inc    OverRunTime
-  brclr	 IdleAdvTimeOK,EnhancedBits6,knock_timer_checks   ;* IdleAdvTimeOK = 0, got to line 10262
+  brclr	 IdleAdvTimeOK,EnhancedBits6,knock_timer_checks                     ;* IdleAdvTimeOK = 0, got to line 10262
   lda	 idlAdvHld
   inca
   sta	 idlAdvHld
 
-knock_timer_checks:
-  lda    KnockTimLft	; Load the knock timer   ;* KnockTimLft = 0T
+knock_timer_checks:                                                         ;* LINE 10262
+  lda    KnockTimLft	; Load the knock timer                              ;* KnockTimLft = 0T
   cmp    #00T
-  beq    Secs			; If its zero carry on with seconds
+  beq    Secs			; If its zero carry on with seconds                 ;* GO TO LINE 10269
   deca				    ; If not dec it
   sta    KnocktimLft
   
-Secs:
-  lda    feature10_f5
-  bit    #ASEIgnCountb    ;* ASEIgnCountb = 1 (cycles)
+Secs:                                                                       ;* LINE 01269
+  lda    feature10_f5                                                       ;* feature10_f5 = %00000000
+  bit    #ASEIgnCountb                                                      ;* ASEIgnCountb = 1 (cycles)
   beq    sec_cont
   inc    ASEcount
   
@@ -10280,20 +10280,20 @@ sec_cont:
 ; if running and !cranking and cant_delay then set cant_crank
 ; else clear cant_delay
 
-  brset  crank,engine,cant_off
-  brclr  running,engine,cant_off
-  brset  cant_delay,EnhancedBits2,cant_set
+  brset  crank,engine,cant_off                                        ;* IF crank = 1 GO TO LINE 10293
+  brclr  running,engine,cant_off                                      ;* IF running = 0 GO TO LINE 10293
+  brset  cant_delay,EnhancedBits2,cant_set                            ;* IF cant_delay = 1 GO TO LINE 10289
   bset   cant_delay,EnhancedBits2
-  bra    sec_fin
+  bra    sec_fin                                                      ;* ELSE GO TO LINE 10296
   
-cant_set:
+cant_set:                                                             ;* LINE 10289
   bset   cant_crank,EnhancedBits2
   bra    sec_fin
   
-cant_off:
+cant_off:                                                             ;* LINE 10293
   bclr   cant_delay,EnhancedBits2
   
-sec_fin:
+sec_fin:                                                              ;* LINE 10296
   clr    tenth
   inc    secl			; bump up second count
   bne    RTC_DONE
@@ -10338,7 +10338,7 @@ RTC_DONE2:
 ;  bclr    TOF,T2SC0
   bset    TOIE,T2SC0	; re-enable 0.1ms interrupt
   
-NOTSPKTIME:				; close branch for below
+NOTSPKTIME:				; close branch for below                           ;* LINE 10341
   pulh
   rti
 
@@ -10349,18 +10349,18 @@ NOTSPKTIME:				; close branch for below
 ***************************************************************************
 
 INT_SPARK_OFFa:
-  jmp    INT_SPARK_OFF
+  jmp    INT_SPARK_OFF                                                     ;* GO TO LINE 10574
   
-j_hires_dwell:
-  jmp    hires_dwell
+j_hires_dwell:                                                             ; lINE 01354
+  jmp    hires_dwell                                                       ;* GO TO LINE 10488 
 
 SPARKTIME:
   pshh
   lda    T2SC1		                            ; Read interrupt
   bclr   CHxF,T2SC1	                            ; Reset interrupt
-  brclr  SparkHSpeed,SparkBits,NOTSPKTIME	    ; Don't spark on time when going slow
-  brset  indwell,EnhancedBits4,j_hires_dwell	; start dwell period
-  brset  EDIS,personality,set_spkon             ;* EDIS = 0
+  brclr  SparkHSpeed,SparkBits,NOTSPKTIME	    ; Don't spark on time when going slow  ;* IF SparkHSpeed = 0 GO TO LINE 10341 
+  brset  indwell,EnhancedBits4,j_hires_dwell	; start dwell period                   ;* IF indwell = 1 GO TO LINE 10354 
+  brset  EDIS,personality,set_spkon                                                    ;* EDIS = 0
   brclr   SparkTrigg,Sparkbits,NOTSPKTIME	    ; Should never do this
 
 ; spark cut used to be here, but moved to TIMERROLL to eliminate chance of
@@ -10371,37 +10371,37 @@ set_spkon:
   
 set_spkon2:
   bset   sparkon,revlimbits	                ; spark now on
-  brset  invspk,EnhancedBits4,sson_inv      ;* invspk = 1, got to line 10380
+  brset  invspk,EnhancedBits4,sson_inv                                            ;* invspk = 1, GO TO LINE 10380
   
     COILNEG			                        ; macro = fire coil for non-inverted
 	
   bra    SparkOnDone
   
-sson_inv:
+sson_inv:                                                                         ;* LINE 10380
 
-    COILPOS			                         ; macro = fire coil for inverted
+    COILPOS			                         ; macro = fire coil for inverted     ;* MACRO AT LINE 8261
 	
 SparkOnDone:
-  brclr  EDIS,personality,sod_ne     ;* EDIS = 0, go to line 10391
+  brclr  EDIS,personality,sod_ne                                                  ;* EDIS = 0, go to line 10391
   jmp    set_saw_on
   
 jsod_cd_done:
   jmp    sod_cd_done
 
-sod_ne:
+sod_ne:                                                                           ;* LINE 10391
   bclr   TOIE,T2SC1	                        ; Disable interrupts
-  brset  dwellcont,feature7,sod_cd          ; dwellcont = 1, go to line 10396
+  brset  dwellcont,feature7,sod_cd                                                ;* dwellcont = 1, go to line 10396
   brset  min_dwell,feature2,jsod_cd_done	; don't schedule here if minimal dwell wanted
   
-sod_cd:
+sod_cd:                                                                           ;* LINE 10396
 
-    CalcDwellspk		                    ; Set spark on time
+    CalcDwellspk		                    ; Set spark on time                   ;* MACRO AT LINE 8348 
 	
 sod_cd_done:
 
 ; now check if we should schedule a trailing spark
 
-  brset  rotary2,EnhancedBits5,chktrail  ;* rotary2 = 0
+  brset  rotary2,EnhancedBits5,chktrail                                           ;* rotary2 = 0
   
 sparktime_exit:
   bclr   SparkTrigg,Sparkbits	            ; No more sparks for this IRQ
@@ -10485,7 +10485,7 @@ to_exit:
   pulh
   rti
 
-hires_dwell:
+hires_dwell:                                                                 ;* LINE 10488
 
 ; never do trailing dwell in "hi-res" so no need to consider trailing here
 ; first turn on coil, then reset T2 to spark point saved in sparktargetH/L
@@ -10493,23 +10493,23 @@ hires_dwell:
 
   lda    SparkCutCnt	            ; Check Spark Counter
   inca
-  cmp    SparkCutBase_f	            ; How many sparks to count to
-  blo    Dont_ResetCnt2
+  cmp    SparkCutBase_f	            ; How many sparks to count to    ;* SparkCutBase = 5T (default)(Rev limit, Launch, Boost not used)                         
+  blo    Dont_ResetCnt2                                              ;* IF (A)<(M) Branch
   lda    #01T
   
 Dont_ResetCnt2:
   sta    SparkCutCnt	            ; Store new value to spark counter
-  brset  sparkCut,RevLimBits,bhrds	; If in spark cut mode jump past spark
-  brset  invspk,EnhancedBits4,hrd_inv
+  brset  sparkCut,RevLimBits,bhrds	; If in spark cut mode jump past spark    ;* sparkCut = 0
+  brset  invspk,EnhancedBits4,hrd_inv                                         ;* invspk = 1, GO TO LINE 10510
   
-    COILPOS			                ; macro = charge coil for non-inverted
+    COILPOS			                ; macro = charge coil for non-inverted    
 	
 bhrds:
   bra    hrd_set
   
-hrd_inv:
+hrd_inv:                                                                     ;* LINE 10510
 
-    COILNEG			                ; macro = charge coil for inverted
+    COILNEG			                ; macro = charge coil for inverted       ;* MACRO AT LINE 8172
 	
 hrd_set:
   bclr   indwell,EnhancedBits4	; turn it off so next sparktime fires coil
@@ -10571,7 +10571,7 @@ set_edis2:
   rti			                           ; uses 0.1ms timer for 1/2 cycle time
 
 
-INT_SPARK_OFF:		                       ; this is only used for EDIS so coilc has no meaning (yet!)
+INT_SPARK_OFF:		                       ; this is only used for EDIS so coilc has no meaning (yet!) LINE 10574
   brset  invspk,EnhancedBits4,InvSparkOff
   brset  REUSE_FIDLE,outputpins,stimef2
   brset  coilbbit,coilsel,stimeb2
@@ -10672,9 +10672,9 @@ no_rollchk:
 
 ; check for simulator first
 
-  brset  whlsim,feature1,jwheelsim        ;* whlsim = 0
-  brset  MSNEON,personality,decode_neon   ;* MSNEON = 0
-  brset  WHEEL,personality,jdecode_wheel  ;* Wheel = 1, go to line 10685
+  brset  whlsim,feature1,jwheelsim                                        ;* whlsim = 0
+  brset  MSNEON,personality,decode_neon                                   ;* MSNEON = 0
+  brset  WHEEL,personality,jdecode_wheel                                  ;* Wheel = 1, go to line 10685
   
 ; set just single coil output
 
@@ -10682,9 +10682,9 @@ no_rollchk:
   bset   coilabit,coilsel
   jmp    done_decode		; everything else that doesn't need wheel decoding
 
-jdecode_wheel:
-  brset  wd_2trig,feature1,jdecode_wheel2  ;* wd_2trig = 0
-  jmp    decode_wheel                      ;* go to line 110 57
+jdecode_wheel:                                                            ;* LINE 10686
+  brset  wd_2trig,feature1,jdecode_wheel2                                 ;* wd_2trig = 0
+  jmp    decode_wheel                                                     ;* GO TO LINE 11057
   
 jdecode_wheel2:
   jmp    decode_wheel2
@@ -11054,10 +11054,10 @@ wd2_cont:
 **
 ****************************************************************************
 
-decode_wheel:
-  lda    numteeth_f    ;* numteeth_f = 36T
+decode_wheel:                                                                  ;* LINE 11057
+  lda    numteeth_f                                                            ;* numteeth_f = 36T
   cmp    #23T			; hard coded lowres/highres transition (was 20T)
-  bhi    w_high        ;* go to line 11073
+  bhi    w_high                                                                ;* GO TO LINE 11073
   
 ; XXXX
 ;  brclr   crank,engine,w_high  ;; XXXX try this to get rpm below 100
@@ -11070,9 +11070,9 @@ w_low:
   mov    lowresH,cTimeH
   bra    w_decode
 
-w_high:
+w_high:                                                                       ;* LINE 11073
   lda    rpm
-  bne    w_high_fast
+  bne    w_high_fast                                                          ;* IF rpm NOT = 0 GO TO LINE 
   
 ; check for very slow rpm that will cause timer overflow.
 ; -1 does *1.5 so max time is 65/1.5 = 43ms  -> 38rpm on 36-1
@@ -11099,7 +11099,7 @@ j_lost_sync2:
   clr    lowresH
   jmp    lost_sync_w
   
-w_high_fast:
+w_high_fast:                                                                    ;* LINE 11102
 
 ; T2 already read at start of handler
 	   
@@ -11116,7 +11116,7 @@ w_decode:
 
 ; new - are we logging teeth?
 
-  brclr  toothlog,EnhancedBits5,w_dec_notlog
+  brclr  toothlog,EnhancedBits5,w_dec_notlog                           ;* IF toothlog = 0 GO TO LINE 11149  
   
 ; we are logging so record something
 
@@ -11131,13 +11131,13 @@ w_decode:
   cpx    #PAGESIZE-4
   blo    wdtl
   clrx
-  lda    numteeth_f              ;* numteeth_f = 36T
+  lda    numteeth_f                                                                ;* numteeth_f = 36T
   cmp    #23T			         ; hard coded lowres/highres transition (was 20T)
-  bhi    wdth                    ;* go to line 11140
+  bhi    wdth                                                                      ;* go to line 11140
   lda    #1                      ; 1 = 0.1ms units
   bra    wdts
   
-wdth:
+wdth:                                                                              ;* LINE 11140
   clra                           ; 0 = 1us units
   
 wdts:
@@ -11146,17 +11146,17 @@ wdts:
 wdtl:
   stx     VE_r+PAGESIZE-2
   
-w_dec_notlog:
+w_dec_notlog:                                                                     ;* LINE 11149
 
 ; added in 029p - always use 024s9 during cranking
 
-  brset  crank,engine,w_decode_ok     ; do not do this while cranking
+  brset  crank,engine,w_decode_ok     ; do not do this while cranking                 ;* IF crank = 1 GO TO LINE 11197 
 
 ; Ryan reports problems with the NEW routine below, so now config option to use 024s9
 ; style decoder instead. This way can swap versions on the fly
 
-  lda    feature6_f
-  bit    #wheel_oldb     ;* numteeth_f = 0, go to line 11169
+  lda    feature6_f                                                                ;* feature6_f = %00000000
+  bit    #wheel_oldb                                                               ;* wheel_oldb = 0, GO TO LINE 11169     
   beq    decoder_new ; 0 = new decoder
 
 ; bypass the tooth false trigger
@@ -11166,7 +11166,7 @@ w_dec_notlog:
 ;  mov     stLp,avgtoothl
   bra    w_decode_ok
 
-decoder_new:
+decoder_new:                                                                        ;* LINE 11169
 
 ; NEW
 ; calculate half of average tooth time
@@ -11194,7 +11194,7 @@ w_decode_false:
   pulh
   rti                                    ; get out of here - false trigger
 
-w_decode_ok:
+w_decode_ok:                                                                           ;* LINE 11197
 
 ;END NEW
   clr    lowresL                         ; always reset the lowres ready for next int
@@ -15287,8 +15287,8 @@ config13_f1	    db      00T	    ; Config13                                  ;* 1
 EGOrpm_f	    db      13T	    ; RPMOXLIMIT                                ;* 185 Tuner Studio egoRPM1 (= 50T (5000RPM, prohibit closed loop , default is 13T 1300 RPM)
 FASTIDLEbg_f	db      234T	;                                           ;* 186 Tuner Studio fastIdleT1
 O2targetV_f	    db      26T	    ; VOLTOXTARGET (187)                        ;* 187 Tuner Studio egoSwitch1
-feature14_f1    db      %00000000   ; (188)  ; allows EGOigncount to be on page1 ;* 188 Tuner Studio egoIgnCount
-egoIgnCountb	equ     1           ;EGO Step Counter         mSecs || Ignition Pulses^
+feature14_f1    db      %00000000   ; (188)  ; allows EGOigncount to be on page1 ;* 188 Tuner Studio egoIgnCount  = %00000001
+egoIgnCountb	equ     1           ;EGO Step Counter         mSecs || Ignition Pulses^                     bit 0 = 1 (ignition pulses)
 
 flash_table1_end:
 
@@ -15381,7 +15381,7 @@ CrankAngle_f	db      56T	    ; Cranking advance (10deg)  *0.352 -28.4           
 				                ;  min -10 max 80
 SparkHoldCyc_f	db      1T	    ; SparkHoldCyc (hold spark x cycles on             ;* 172 Tuner Studio IgHold    (0 )
 				                ; stall and restart)
-SparkConfig1_f	db   %00001100	; SparkConfig1 (Normal trigger, trigger            ;* 173 Tuner Studio Trig_plus  (= %00001100 )
+SparkConfig1_f	db   %00001100	; SparkConfig1 (Normal trigger, trigger            ;* 173 Tuner Studio Trig_plus  (= %00001000 )
 				                ; return based low speed spark) Standard MSnS
                                 ; 029g changed default, was %00000100 for non-inverted spark output after re-flash
 ; Sparkconfig1 equates
