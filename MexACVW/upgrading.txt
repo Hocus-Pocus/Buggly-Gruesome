@@ -1,0 +1,91 @@
+These notes are really only applicable to Megatune users.
+
+NOTES ON UPGRADING FROM 027 codes or 024s13a,b,c
+================================================
+(For other codes see lower down)
+
+Code 029 uses a newer version of Megatune which has stricter error
+checking than earlier versions. You may need to re-edit settings.ini
+and custom.ini to get rid of these errors. If you don't fancy manual
+edits then rename your car1 folder before installing Megatune 2.25
+(See the 024s13 notes for this)
+
+The biggest change in 029 from earlier codes is a change in memory layout.
+To avoid retyping all your settings you can use Megatune to write an
+XML format MSQ file. These settings will read into the new code with
+little or no retyping.
+
+So, before upgrading your firmware, create an XML format MSQ as follows.
+
+1. Make SURE you have saved your Megasquirt settings using your
+existing version of Megatune.
+File->Save in Megatune. Keep that "MSQ" file safe.
+Take a print of the Warmup Wizard settings as these will not be transferred.
+
+2. Rename you existing car1 folder
+Open up Windows Explorer,
+Navigate to C:\Program Files\Megasquirt
+Right click on car1
+Rename
+Name it car1old
+
+3. Download and install Megatune2.25 from
+http://not2fast.wryday.com/megasquirt/mt/2.25/mt225_setup.exe
+This should create a new car1 folder
+Note! If you have problems with Megatune crashing "sorry there was an
+error" during startup, see the Megatune subforum of msefi.com
+(One fix I found on XP was to move the Megasquirt directory somewhere
+else instead of "Program Files" e.g. c:\efi if you do this you will
+need to create new shortcuts.)
+
+4. Use the MtCfg programme to edit your car1/settings.ini
+Enable the MSNS_EXTRA code and setup degC, degF and your oxygen
+sensor.
+This is the same as you will have done when first installing Extra.
+(optionally you can hand edit)
+
+5. While still in MtCfg, see if there is a matching ini file listed for
+you existing firmware, if there is then
+File->Activate it.
+
+6. Exit Mtcfg and run Megatune.
+
+7. If all is well MT should open up without any errors.
+
+8. Load in the MSQ you saved in step 1.
+
+9. Check a few settings to make sure it is ok.
+
+10. File-> Save As with a new name. This should be a new format XML file.
+10a. Load and save any other MSQs you want to transfer.
+10b. Edit these new files with notepad and use search->find to find the
+     string "wueBins5", replace it with "wueBins9"
+
+11. Now proceed to upgrade the firmware, double click on download-firmware
+
+12. Double click on copyini.bat
+(this copies the correct msns-extra.ini file over to Megatune)
+ Or use MtCfg to activate msns-extra.ini.029XX (not there yet)
+
+13. Open up Megatune
+
+14. Load in the MSQ you saved in step 10.
+
+15. Re-type your warmup wizard settings.
+
+16. Check check and check your settings. If you have any/many missing
+    settings please post on the MSnS-extra forum.
+
+
+NOTES ON UPGRADING FROM pre 024 codes such as 021u3
+==============================================================
+
+Upgrading is a little more involved as the memory layout was changed.
+Your best approach is to export the spark and fuel tables File->Export
+within the table. Save these for all your tables.
+Then do the install of the firmware and Megatune.
+Open up Megatune with the MS connected and import your fuel and spark
+tables. The other settings will need to be keyed in.
+
+You may be able to follow a similar procedure to the above step above
+if the new Megatune release has an ini file to match your firmware version.

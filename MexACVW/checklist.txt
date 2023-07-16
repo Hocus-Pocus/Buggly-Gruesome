@@ -1,0 +1,13 @@
+Developer checklist before release:
+ Make changes
+ Add revision notes, change code version.
+ Compile code
+ Move .s19
+ download-firmware
+ Update .ini
+ copyini
+ Check Megatune on stim
+ Save default.msq
+ Delete .bak, .lst, .err
+ Update readme.txt
+ Zip up and upload
