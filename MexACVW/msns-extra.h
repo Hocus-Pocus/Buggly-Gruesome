@@ -14,9 +14,9 @@
 ;* MegaSquirt Hardware Wiring
 ;*
 ; Port A
-;  PTA0 - FP
-;  PTA1 - FIDLE
-;  PTA2 - Output 2 (X5)
+;  PTA0 - FP                                            ;* fuelp
+;  PTA1 - FIDLE                                         ;* iasc
+;  PTA2 - Output 2 (X5)                                 ;* Tacho
 ;  PTA3 - Output 1 (X4)
 ;  PTA4             X3
 ;  PTA5             X2
@@ -24,18 +24,18 @@
 ;  PTA7 - Flyback
 
 ; Port B (ADC inputs)
-;  PTB0/AD0 - MAP
-;  PTB1/AD1 - MAT
-;  PTB2/AD2 - CLT
-;  PTB3/AD3 - TPS
-;  PTB4/AD4 - BAT
-;  PTB5/AD5 - EGO
+;  PTB0/AD0 - MAP                                        ;* MAP
+;  PTB1/AD1 - MAT                                        ;* MAT
+;  PTB2/AD2 - CLT                                        ;* CLT
+;  PTB3/AD3 - TPS                                        ;* TPS
+;  PTB4/AD4 - BAT                                        ;* BAT
+;  PTB5/AD5 - EGO                                        ;* EGO
 ;  PTB6/AD6 - "X7" spare, EGO2, fuel pressure or 2nd MAP
 ;  PTB7/AD7 - "X6" spare, EGT
 
 ; Port C
-;  PTC0 - Squirt LED  or coil a
-;  PTC1 - Accel LED   or coil b or HEI7 bypass
+;  PTC0 - Squirt LED  or coil a                          ;* coila
+;  PTC1 - Accel LED   or coil b or HEI7 bypass           ;* coilb
 ;  PTC2 - Warmup LED  or coil c or output 4
 ;  PTC3 } multiplexed shift { or coil e
 ;  PTC4 } light outputs     { or 2nd trig input
@@ -45,8 +45,8 @@
 ;  PTD1/MISO - nitrous in / table switch
 ;  PTD2/MOSI - knock in / coil f
 ;  PTD3/SPSCK - launch in
-;  PTD4/T1CH0 - Inj1
-;  PTD5/T1CH1 - Inj2
+;  PTD4/T1CH0 - Inj1                                     ;* Inj1
+;  PTD5/T1CH1 - Inj2                                     ;* Inj2
 
 
 ; portd
