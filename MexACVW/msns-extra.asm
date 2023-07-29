@@ -1,4 +1,4 @@
-;****************************************************************************
+;***************************************************************************
 ;* msns-extra.asm MexACVW version
 ;* By Robert Hiebert, Project started July 11 2023
 ;*
@@ -10,173 +10,9 @@
 ;* Text editor Notepad++
 ;* Developement suite Winide.exe
 ;****************************************************************************
-
-.header 'MegaSquirt'
-;.base 10t
-.pagewidth 130
-.pagelength 90
-;.set simulate
-
-.nolist
-	include "gp32.equ"
-.list
-	org	ram_start
-	include "msns-extra.h"
-
-;***************************************************************************
-; Argument list for LinInterp, used throughout.
-;
-; If you move these down to LinInterp, the assembler can't use direct
-; addressing for some arguments, so the code is bigger.
-
-liX1             equ  tmp1
-liX2             equ  tmp2
-liY1             equ  tmp3
-liY2             equ  tmp4
-liX              equ  tmp5
-liY              equ  tmp6 ; Function output.
-
-; udvd32 uses some memory space, use tmp instead
-INTACC1          equ tmp1  ; and 2,3,4
-INTACC2          equ tmp5  ; and 6,7,8
-                           ; tmp9,10,11 used within udvd32
-; udvd32 is only used within Calcrpm, ought to rewrite a simpler routine
-
-; misc_spark uses these
-dwelltmpX        equ  tmp2
-dwelltmpH        equ  tmp3
-dwelltmpL        equ  tmp4
-dwelltmpXp       equ  tmp12
-dwelltmpHp       equ  tmp13
-dwelltmpLp       equ  tmp14
-dwelltmpXac      equ  tmp20  ; use these so they don't get trashed by lookup
-dwelltmpHac      equ  tmp21
-dwelltmpLac      equ  tmp22
-dwelltmpXop      equ  tmp5   ; these are the us result
-dwelltmpHop      equ  tmp6
-dwelltmpLop      equ  tmp7
-dwelltmpXms      equ  tmp8   ; these are the 0.1ms result before transferring to dwelldelay1,2,3,4
-dwelltmpHms      equ  tmp9
-dwelltmpLms      equ  tmp10
-
-SparkdltX        equ  tmp2  ; not used at same time as dwelltmpX etc.
-SparkdltH        equ  tmp3
-SparkdltL        equ  tmp4
-
-;***************************************************************************
-;* some paging macros. (Were subroutines but consume yet more stack)
-;***************************************************************************
-
-; NOTE! page  stores which table is paged into RAM.
-
-;                    VE TABLE 1
-$MACRO ve1x   				; gets a VE byte from page1 or RAM.
-					        ; On entry X contains index.
-					        ; Returns byte in A
-        lda     page
-        cmp     #01T
-        bne     ve1xf
-        lda     VE_r,x
-        bra     ve1xc
-ve1xf:  lda     VE_f1,x
-ve1xc:
-$MACROEND
-
-;                   VE TABLE 2
-$MACRO ve2x				; gets a VE byte from page2 or RAM.
-					    ; On entry X contains index.
-					    ; Returns byte in A
-        lda     page
-        cmp     #02T
-        bne     ve2xf
-        lda     VE_r,x
-        bra     ve2xc
-ve2xf:  lda     VE_f2,x
-ve2xc:
-$MACROEND
-
-;                  SPARK TABLE 1
-$MACRO ve3x   				; gets a ST byte from page3 or RAM.
-					        ; On entry X contains index.
-					        ; Returns byte in A
-        lda     page
-        cmp     #03T
-        bne     ve3xf
-        lda     VE_r,x
-        bra     ve3xc
-ve3xf:  lda     ST_f1,x
-ve3xc:
-$MACROEND
-
-;                  SPARK TABLE 2
-$MACRO ve4x				; gets a ST byte from page4 or RAM.
-					    ; On entry X contains index.
-					    ; Returns byte in A
-        lda     page
-        cmp     #04T
-        bne     ve4xf
-        lda     VE_r,x
-        bra     ve4xc
-ve4xf:  lda     ST_f2,x
-ve4xc:
-$MACROEND
-
-;                   VE TABLE 3
-$MACRO ve5x				; gets a VE byte from page5 or RAM.
-					    ; On entry X contains index.
-					    ; Returns byte in A
-        lda     page
-        cmp     #05T
-        bne     ve5xf
-        lda     VE_r,x
-        bra     ve5xc
-ve5xf:  lda     VE_f3,x
-ve5xc:
-$MACROEND
-
-;                  AFR TABLE 1 for VE1
-$MACRO AFR1X				; gets an AFR byte from page6 or RAM.
-					        ; On entry X contains index.
-					        ; Returns byte in A
-        lda     page
-        cmp     #06T
-        bne     ve6xf
-        lda     VE_r,x
-        bra     ve6xc
-ve6xf:  lda     AFR_f1,x
-ve6xc:
-$MACROEND
-
-;                 AFR TABLE 2 for VE3
-$MACRO AFR2X				; gets an AFR byte from page7 or RAM.
-					        ; On entry X contains index.
-					        ; Returns byte in A
-        lda     page
-        cmp     #07T
-        bne     ve7xf
-        lda     VE_r,x
-        bra     ve7xc
-ve7xf:  lda     AFR_f2,x
-ve7xc:
-$MACROEND
-
-
-;***************************************************************************
-;**
-;** Main Routine Here - Initialization and main loop
-;**
-;** Note: Org down 128 bytes below the "rom_start" point
-;**       because of erase bug in bootloader routine
-;** All MS HC908 continue to be shipped with the bug to preserve backward
-;** compatability (BB posted on this on www.msefi.com)
-;** Do not mess with this offset or your chip won't boot!
-;**
-;** Note: Items commented out after the Start entry point are
-;**       taken care of in the Boot_R12.asm code
-;***************************************************************************
-
-; MegaSquirt Hardware Wiring
-
+;*
+;* MegaSquirt Hardware Wiring
+;*
 ; Port A
 ;  PTA0 - FP                                            ;* fuelp
 ;  PTA1 - FIDLE                                         ;* iasc
@@ -212,153 +48,317 @@ $MACROEND
 ;  PTD4/T1CH0 - Inj1                                     ;* Inj1
 ;  PTD5/T1CH1 - Inj2                                     ;* Inj2
 
+
+.header 'MegaSquirt'
+;.base 10t
+.pagewidth 130
+.pagelength 90
+;.set simulate
+
+.nolist
+	include "gp32.equ"
+.list
+	org	ram_start
+	include "msns-extra.h"
+	
 ;***************************************************************************
+***************************************************************************
+; Argument list for LinInterp, used throughout.
+;
+; If you move these down to LinInterp, the assembler can't use direct
+; addressing for some arguments, so the code is bigger.
 
+liX1      equ  tmp1
+liX2      equ  tmp2
+liY1      equ  tmp3
+liY2      equ  tmp4
+liX       equ  tmp5
+liY       equ  tmp6 ; Function output.
+
+;udvd32 uses some memory space, use tmp instead
+INTACC1          equ tmp1  ; and 2,3,4
+INTACC2          equ tmp5  ; and 6,7,8
+;                    tmp9,10,11 used within udvd32
+; udvd32 is only used within Calcrpm, ought to rewrite a simpler routine
+
+;misc_spark uses these
+dwelltmpX        equ  tmp2
+dwelltmpH        equ  tmp3
+dwelltmpL        equ  tmp4
+dwelltmpXp       equ  tmp12
+dwelltmpHp       equ  tmp13
+dwelltmpLp       equ  tmp14
+dwelltmpXac      equ  tmp20  ; use these so they don't get trashed by lookup
+dwelltmpHac      equ  tmp21
+dwelltmpLac      equ  tmp22
+dwelltmpXop      equ  tmp5   ; these are the us result
+dwelltmpHop      equ  tmp6
+dwelltmpLop      equ  tmp7
+dwelltmpXms     equ  tmp8   ; these are the 0.1ms result before transferring to dwelldelay1,2,3,4
+dwelltmpHms     equ  tmp9
+dwelltmpLms     equ  tmp10
+
+SparkdltX        equ  tmp2  ; not used at same time as dwelltmpX etc.
+SparkdltH        equ  tmp3
+SparkdltL        equ  tmp4
+
+***************************************************************************
+*some paging macros. (Were subroutines but consume yet more stack)
+***************************************************************************
+;***************************************************************************
+; NOTE! page  stores which table is paged into RAM.
+
+;                    VE TABLE 1
+$MACRO ve1x   				; gets a VE byte from page1 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #01T
+        bne     ve1xf
+        lda     VE_r,x
+        bra     ve1xc
+ve1xf:  lda     VE_f1,x
+ve1xc:
+$MACROEND
+
+;                   VE TABLE 2
+$MACRO ve2x				; gets a VE byte from page2 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #02T
+        bne     ve2xf
+        lda     VE_r,x
+        bra     ve2xc
+ve2xf:  lda     VE_f2,x
+ve2xc:
+$MACROEND
+
+;                  SPARK TABLE 1
+$MACRO ve3x   				; gets a ST byte from page3 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #03T
+        bne     ve3xf
+        lda     VE_r,x
+        bra     ve3xc
+ve3xf:  lda     ST_f1,x
+ve3xc:
+$MACROEND
+
+;                  SPARK TABLE 2
+$MACRO ve4x				; gets a ST byte from page4 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #04T
+        bne     ve4xf
+        lda     VE_r,x
+        bra     ve4xc
+ve4xf:  lda     ST_f2,x
+ve4xc:
+$MACROEND
+
+;                   VE TABLE 3
+$MACRO ve5x				; gets a VE byte from page5 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #05T
+        bne     ve5xf
+        lda     VE_r,x
+        bra     ve5xc
+ve5xf:  lda     VE_f3,x
+ve5xc:
+$MACROEND
+
+;                  AFR TABLE 1 for VE1
+$MACRO AFR1X				; gets an AFR byte from page6 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #06T
+        bne     ve6xf
+        lda     VE_r,x
+        bra     ve6xc
+ve6xf:  lda     AFR_f1,x
+ve6xc:
+$MACROEND
+
+;                 AFR TABLE 2 for VE3
+$MACRO AFR2X				; gets an AFR byte from page7 or RAM.
+					; On entry X contains index.
+					; Returns byte in A
+        lda     page
+        cmp     #07T
+        bne     ve7xf
+        lda     VE_r,x
+        bra     ve7xc
+ve7xf:  lda     AFR_f2,x
+ve7xc:
+$MACROEND
+
+;***************************************************************************
+***************************************************************************
+**
+** Main Routine Here - Initialization and main loop
+**
+** Note: Org down 128 bytes below the "rom_start" point
+**       because of erase bug in bootloader routine
+** All MS HC908 continue to be shipped with the bug to preserve backward
+** compatability (BB posted on this on www.msefi.com)
+** Do not mess with this offset or your chip won't boot!
+**
+** Note: Items commented out after the Start entry point are
+**       taken care of in the Boot_R12.asm code
+***************************************************************************
 	org	{rom_start + 128}
-
 Start:
-	ldhx	#init_stack+1   ; Set the stack Pointer
-	txs				        ; Move before burner to avoid conflict
+	ldhx	#init_stack+1		; Set the stack Pointer
+	txs				; Move before burner to avoid conflict
 
 ; Clock now 8MHz - DJLH
-
-	bclr  BCS,pctl	    ; Select external Clock Reference
-	bclr  PLLON,pctl	; Turn Off PLL
-	mov	  #$02,pctl		; Set P and E Bits
-	mov	  #$D0,pmrs		; Set L
-	mov	  #$03,pmsh		; Set N (MSB)
-	mov	  #$D1,pmsl		; Set N (LSB)
-	bset  AUTO,pbwc
-	bset  PLLON,pctl	; Turn back on PLL
-
-; PLLwait:
-    brclr LOCK,pbwc,*
-    bset  BCS,pctl
+	bclr	BCS,pctl		; Select external Clock Reference
+	bclr	PLLON,pctl		; Turn Off PLL
+	mov	#$02,pctl		; Set P and E Bits
+	mov	#$D0,pmrs		; Set L
+	mov	#$03,pmsh		; Set N (MSB)
+	mov	#$D1,pmsl		; Set N (LSB)
+	bset	AUTO,pbwc
+	bset	PLLON,pctl		; Turn back on PLL
+;PLLwait:
+        brclr   LOCK,pbwc,*
+        bset    BCS,pctl
 
 
-;**************************************************************************
+;
 ;   Set all RAM to known value - for code runaway protection.
 ;   If there is ever a code runaway, and processor tries
-;   executing this as an opcode ($32) then a reset will occur.
-;**************************************************************************
-
-	ldhx   #ram_start	; Point to start of RAM
-
+;    executing this as an opcode ($32) then a reset will occur.
+;
+	ldhx   #ram_start		; Point to start of RAM
 ClearRAM:
-	lda	   #$32			; This is an illegal op-code -
-					    ; cause reset if executed
+	lda	#$32			; This is an illegal op-code -
+					; cause reset if executed
 	sta    ,x			; Set RAM location
 	aix    #1			; advance pointer
-	cphx   #ram_last+1	; done ?
-	bne    ClearRAM		; loop back if not
+	cphx   #ram_last+1		; done ?
+	bne    ClearRAM			; loop back if not
 
 
 ; Set up the port data-direction registers
 
-    lda     #%00000000
-    sta     ddrb			; Set as inputs (ADC will select
-					        ; which channel later)
-    lda     #%00110000		; Turn off injectors (inverted output)
-    sta     portd
-    bset    launch,ptdpue
-    bset    NosIn,ptdpue    ; Set all the inputs internal
-					        ; pull ups On
-
+        lda     #%00000000
+        sta     ddrb			; Set as inputs (ADC will select
+					; which channel later)
+        lda     #%00110000		; Turn off injectors (inverted output)
+        sta     portd
+        bset    launch,ptdpue
+        bset    NosIn,ptdpue		; Set all the inputs internal
+					; pull ups On
+;***************************************************************************
 ;*        lda     feature8_f              ; using spark F ?
-;*        bit     #spkfopb
+;*        bit     #spkfopb                                    ;* spkfopb = 0
 ;*        beq     no_spk_f
 ;*        lda     #%11110101              ; make pin an output
 ;*        bra     store_ddrd
 ;*no_spk_f:
-    bset    KnockIn,ptdpue
-    lda     #%11110001		; Changed to 0 is an output
+        bset    KnockIn,ptdpue
+        lda     #%11110001		; Changed to 0 is an output
+store_ddrd:
+        sta     ddrd			; Outputs for injector
 
-;*store_ddrd:
-    sta     ddrd			; Outputs for injector
-    clr     porta
-    lda     #%11111111
-    sta     ddra			; Outputs for Fp and Spark
-    lda     #$00
-    sta     portc
-
-;is PTC4 an input?    - see also 'B' code section
+        clr     porta
+        lda     #%11111111
+        sta     ddra			; Outputs for Fp and Spark
+        lda     #$00
+        sta     portc
+;*;is PTC4 an input?    - see also 'B' code section
 ;*        lda     feature1_f   ; we haven't copied to RAM yet
-;*        bit     #wd_2trigb
+;*        bit     #wd_2trigb                                 ;* wd_2trigb = 0
 ;*        beq     norm_op_ddrc
 ;*        lda     #%00001111              ; make PTC4 an input for second trigger
 ;*        bra     op_ddrc
 ;*norm_op_ddrc:
-    lda     #%00011111		; ** Was 11111111
-;*op_ddrc:
-    sta     ddrc			; Outputs for LED
-    lda     #%00000001		; Serial Comm Port
-    sta     ddre
+        lda     #%00011111		; ** Was 11111111
+op_ddrc:
+        sta     ddrc			; Outputs for LED
+        lda     #%00000001		; Serial Comm Port
+        sta     ddre
 
 ; Set up the Real-time clock Timer (TIM2)
+        MOV     #%00110011,t2sc		; Stop Timer so it can be set up
+					; No overflow interrupt, stop,
+					; reset, div / 8
 
-    MOV     #%00110011,t2sc	 ; Stop Timer so it can be set up
-					         ; No overflow interrupt, stop,
-					         ; reset, div / 8
-    mov     #$FF,T2MODH		 ; Free running timer
-    mov     #$FF,T2MODL
-    mov     #0T,T2CH0H		 ; Channel 0 high, 0
-    mov     #100T,T2CH0L	 ; Channel 0 low, 100 = 0.1 ms
-					         ; @ 8.0MHz - DJLH
-    mov     #%01010100,T2SC0 ; Output compare, interrupt enabled
-    mov     #$00,T2CH1H		 ; Channel 1 high, to be used
-					         ; for spark control
-    mov     #$00,T2CH1L		 ; Channel 1 low, 0
-    mov     #%01010100,T2SC1 ; Channel 1 Output compare,
-					         ; interrupt enabled
+        mov     #$FF,T2MODH		; Free running timer
+        mov     #$FF,T2MODL
 
-    bclr    TOF,T2SC1		; clear any pending interrupt
-    bclr    TOIE,T2SC1		; Disable timer interrupt until
-					        ; we are ready
+        mov     #0T,T2CH0H		; Channel 0 high, 0
+;        mov     #92T,T2CH0L		; Channel 0 low, 92 = 0.1 ms
+        mov     #100T,T2CH0L		; Channel 0 low, 100 = 0.1 ms
+					; @ 8.0MHz - DJLH
+        mov     #%01010100,T2SC0	; Output compare, interrupt enabled
 
-    mov     #%01010011,T2SC		; Start timer, overflow int, div / 8
+        mov     #$00,T2CH1H		; Channel 1 high, to be used
+					; for spark control
+        mov     #$00,T2CH1L		; Channel 1 low, 0
+        mov     #%01010100,T2SC1	; Channel 1 Output compare,
+					; interrupt enabled
+; edis? mov     #%01010000,T2SC1	; Channel 1 Output compare,
+					; interrupt enabled
+        bclr    TOF,T2SC1		; clear any pending interrupt
+        bclr    TOIE,T2SC1		; Disable timer interrupt until
+					; we are ready
+
+
+;;        mov     #%00010011,T2SC		; Start timer, no overflow int, div / 8
+        mov     #%01010011,T2SC		; Start timer, overflow int, div / 8
 
 ; Set up the PWM for the Injector (for current limit mode)
-
-    MOV     #T1Timerstop,t1sc ; Stop Timer so it can be set up
-    mov     #$00,T1MODH
-    mov     #$64,T1MODL		  ; set timer modulus register to 100
-					          ; decimal
-    mov     #$00,T1CH0H
-    lda     INJPWM_f1
-    sta     T1CH0L
-    mov     #$00,T1CH1H
-;*    lda     dtmode_f
-;*    bit     #alt_i2t2
-;*    beq     setpwmsingle
-;*    lda     INJPWM_f2
-;*    bra     store_pwm
-
-;*setpwmsingle:
-    lda     INJPWM_f1
-
-;*store_pwm:
-    sta     T1CH1L
+        MOV     #T1Timerstop,t1sc	; Stop Timer so it can be set up
+        mov     #$00,T1MODH
+        mov     #$64,T1MODL		; set timer modulus register to 100
+					; decimal
+;	mov     #T1SCX_NO_PWM,T1SC0	; make this normal port output
+					; (PWM MODE is #$5E)
+;	mov     #T1SCX_NO_PWM,T1SC1	; make this normal port output
+					; (PWM MODE is #$5E)
+        mov     #$00,T1CH0H
+        lda     INJPWM_f1
+        sta     T1CH0L
+        mov     #$00,T1CH1H
+        lda     dtmode_f
+        bit     #alt_i2t2
+        beq     setpwmsingle
+        lda     INJPWM_f2
+        bra     store_pwm
+setpwmsingle:
+        lda     INJPWM_f1
+store_pwm:
+        sta     T1CH1L
+;        MOV     #Timergo_NO_INT,T1SC	;  No interrupts for this
 
 ; Set up SCI port
-	lda	 #$30		  ; This is 9615 baud w/ the osc
-					  ; frequency 8.0M - DJLH
-	sta	  scbr
-	bset  ensci,scc1  ; Enable SCI
-	bset  RE,SCC2	  ; Enable receiver
-    bset  SCRIE,SCC2  ; Enable Receive interrupt
-	lda	  SCS1		  ; Clear SCI transmitter Empty Bit
-    clr   txcnt
-    clr   txgoal
+	lda	#$30			; This is 9615 baud w/ the osc
+					; frequency 8.0M - DJLH
+	sta	scbr
+	bset	ensci,scc1		; Enable SCI
+	bset	RE,SCC2			; Enable receiver
+        bset    SCRIE,SCC2              ; Enable Receive interrupt
+	lda	SCS1			; Clear SCI transmitter Empty Bit
+        clr     txcnt
+        clr     txgoal
 
 ; Set up Interrupts
-    mov   #%00000100,INTSCR	 ; Enable IRQ
-
-; clear water outputs
-    bclr   water,porta	   ; water injection
-    bclr   water2,porta    ; 2nd water injection output
-;*    brset    out3sparkd,feature2,w_no3
-    bclr   Output3,portd
-
+        mov     #%00000100,INTSCR	;Enable IRQ
+;***************************************************************************
+;clear water outputs
+        bclr     water,porta		;water injection
+        bclr     water2,porta           ;2nd water injection output
+;*        brset    out3sparkd,feature2,w_no3              ;* out3sparkd = 0
+        bclr     Output3,portd
 w_no3:
 ;
 ; Load the constants (VE Table, etc) from Flash to RAM - the program
@@ -370,187 +370,197 @@ w_no3:
 ; release will use all other variables from flash ONLY - so be sure to
 ; "send" the data after changes.
 ;
-    lda      #$ff
-    sta      page		; select invalid page to make
-					    ;sure we run from flash
-
+        lda      #$ff
+        sta      page		; select invalid page to make
+					;sure we run from flash
 ; Set up RAM Variable - also when burning page0 search for "burning page0"
-    lda     feature1_f
-    sta     feature1
-    lda     feature2_f
-    sta     feature2
-    lda     feature7_f
-    sta     feature7
-    lda     outputpins_f
-    sta     outputpins
-    lda     personality_f
-    sta     personality		;move from flash to ram
+        lda     feature1_f                         ;* feature1_f = %01001000
+        sta     feature1
+        lda     feature2_f                         ;* feature2_f = %00000000
+        sta     feature2
+;***************************************************************************
+;        lda     feature3_f - flash only
+;        sta     feature3
+;        lda     feature4_f - flash only
+;        sta     feature4
+;        lda     feature5_f - flash only
+;        sta     feature5
+;        lda     feature6_f - flash only
+;        sta     feature6
+        lda     feature7_f                         ;* feature7_f = %00000010
+        sta     feature7
+;        lda     feature8_f - flash only
+;        sta     feature8
+        lda     outputpins_f                    ;* outputpins_f = %001100110
+        sta     outputpins
+        lda     personality_f                    ;* personality_f = %00000100
+        sta     personality		;move from flash to ram
 
-    clr     mms
-    clr     ms
-    clr     tenth
-    clr     secl
-    clr     sech
-    clr     squirt
-    clr     engine
-    clr     rpmph
-    clr     rpmpl
-    clr     rpmch
-    clr     rpmcl
-    clr     rpm
-    clr	    flocker
-    lda     #$00
-    sta     splitdelH       ; initial value for rotary split
-    sta     splitdelL
-    sta     iTimepX
-    sta     iTimepH
-    sta     iTimepL
-    sta     KnockAngleRet
-    sta     KnockAdv
-    sta     KnockTimLft
-    sta     KnockAngle
-    sta     TCAngle
-    sta     KnockBoost
-    sta     CltIatAngle
-    sta     TCAccel
-    sta     pwcalc1
-    sta     pwcalc2
-    sta     pw1
-    sta     pw2
-    clr     pwrun1
-    clr     pwrun2
-    lda     #$FF
-    sta     TPSlast
-    sta     rpmlast
-    clr     egocount
-    sta     N2Olaunchdel
+        clr     mms
+        clr     ms
+        clr     tenth
+        clr     secl
+        clr     sech
+        clr     squirt
+        clr     engine
+        clr     rpmph
+        clr     rpmpl
+        clr     rpmch
+        clr     rpmcl
+        clr     rpm
+        clr	flocker
+        lda     #$00
+        sta     splitdelH       ; initial value for rotary split
+        sta     splitdelL
+        sta     iTimepX
+        sta     iTimepH
+        sta     iTimepL
+        sta     KnockAngleRet
+        sta     KnockAdv
+        sta     KnockTimLft
+        sta     KnockAngle
+        sta     TCAngle
+        sta     KnockBoost
+        sta     CltIatAngle
+        sta     TCAccel
+        sta     pwcalc1
+        sta     pwcalc2
+        sta     pw1
+        sta     pw2
+        clr     pwrun1
+        clr     pwrun2
+        lda     #$FF
+        sta     TPSlast
+        sta     rpmlast
+        clr     egocount
+        sta     N2Olaunchdel
 
-    ldhx    #0
-    sthx    dwelldelay1
-    sthx    dwelldelay2
-    sthx    dwelldelay3
-    sthx    dwelldelay4
-    sthx    dwelldelay5
-    sthx    dwelldelay6
+        ldhx    #0
+        sthx    dwelldelay1
+        sthx    dwelldelay2
+        sthx    dwelldelay3
+        sthx    dwelldelay4
+        sthx    dwelldelay5
+        sthx    dwelldelay6
 
-    lda     #$BB
-    sta     baro
-    sta     map
-    sta     mat
-    sta     clt
-    sta     tps
-    sta     batt
+        lda     #$BB
+        sta     baro
+        sta     map
+        sta     mat
+        sta     clt
+        sta     tps
+        sta     batt
 
-    lda     #$64
-    sta     aircor
-    sta     vecurr
-    sta     barocor
-    sta     warmcor
-    sta     egocorr
-    sta     EgoCorr2
-	sta	    tpsfuelcut
+        lda     #$64
+        sta     aircor
+        sta     vecurr
+        sta     barocor
+        sta     warmcor
+        sta     egocorr
+        sta     EgoCorr2
+	sta	tpsfuelcut
+        clr     gammae
+;        lda     #$46  - why ? just stored $BB above
+;        sta     map
+;        lda     #$65
+;        sta     baro
+        clr     tpsaccel
+        clr     Decay_Accel
+        clr     igncount1
+        clr     igncount2
+        clr     idleDC			; set fully closed
+        clr     idlelastdc		; PWM idle kg
+        bclr    idleon,engine		; PWM idle kg
+        bclr    idashbit,EnhancedBits6	; PWM idle kg
+        bclr    istartbit,EnhancedBits6	; PWM idle kg
+        lda     Spark2Delay_f                             ;* Spark2Delay_f = 0
+        sta     ST2Timer		; Set delay timer for ST2
+        lda     VE3Delay_f                                ;* VE3Delay_f = 0
+        sta     VE3Timer		; Set Delay timer for VE 3
+        clra
+	sta	idledelayclock		; PWM idle kg
+        sta     TCSparkCut
+        sta     SRevLimTimeLeft
+        sta     NitrousAngle		; Clear the NOS Angle
+        sta     NosPW			; Clear the Nos PW
+        sta     SparkCutCnt		; Spark Cut counter - Enhanced
+        sta     pw_staged		; Reset the Staged PW
+	sta	pw_staged2
+	sta	stgTransitionCnt
+	sta	idlAdvHld
+        clr     SparkBits
+        clr     Sparkonleftah
+        clr     Sparkonleftal
+        clr     Sparkonleftbh
+        clr     Sparkonleftbl
+        clr     Sparkonleftch
+        clr     Sparkonleftcl
+        clr     Sparkonleftdh
+        clr     Sparkonleftdl
+        clr     Sparkonlefteh
+        clr     Sparkonleftel
+        clr     Sparkonleftfh
+        clr     Sparkonleftfl
+        clr     lowresH			; low res (0.1ms) timer
+        clr     lowresL			;
+        lda     dwellcrank_f                            ;* dwellcrank = 45T
+        sta     dwelldms		; initial dwell period
+        mov     #$10,dwellush		; } high speed dwell delay,
+					; default of 4.1ms
+        clr     dwellusl		; } until calc in main loop
+        bset    SparkLSpeed,SparkBits	; At boot turn on low speed ignition
+        clr     RevLimBits
+        clr     EnhancedBits
+        clr     EnhancedBits2
+        clr     EnhancedBits4
+        clr     EnhancedBits5
+        clr     EnhancedBits6
+        clr     coilsel
+        bset    coilabit,coilsel
+        bset    coilerr,RevLimBits	; set "error" bit so first coil found is used
 
-    clr     gammae
-    clr     tpsaccel
-    clr     Decay_Accel
-    clr     igncount1
-    clr     igncount2
-    clr     idleDC			        ; set fully closed
-    clr     idlelastdc		        ; PWM idle kg
-    bclr    idleon,engine		    ; PWM idle kg
-    bclr    idashbit,EnhancedBits6	; PWM idle kg
-    bclr    istartbit,EnhancedBits6	; PWM idle kg
-    lda     Spark2Delay_f
-    sta     ST2Timer		        ; Set delay timer for ST2
-    lda     VE3Delay_f
-    sta     VE3Timer		        ; Set Delay timer for VE 3
-
-    clra
-	sta	    idledelayclock		    ; PWM idle kg
-    sta     TCSparkCut
-    sta     SRevLimTimeLeft
-    sta     NitrousAngle		    ; Clear the NOS Angle
-    sta     NosPW			        ; Clear the Nos PW
-    sta     SparkCutCnt		        ; Spark Cut counter - Enhanced
-    sta     pw_staged		        ; Reset the Staged PW
-	sta	    pw_staged2
-	sta	    stgTransitionCnt
-	sta	    idlAdvHld
-    clr     SparkBits
-    clr     Sparkonleftah
-    clr     Sparkonleftal
-    clr     Sparkonleftbh
-    clr     Sparkonleftbl
-    clr     Sparkonleftch
-    clr     Sparkonleftcl
-    clr     Sparkonleftdh
-    clr     Sparkonleftdl
-    clr     Sparkonlefteh
-    clr     Sparkonleftel
-    clr     Sparkonleftfh
-    clr     Sparkonleftfl
-    clr     lowresH			       ; low res (0.1ms) timer
-    clr     lowresL			       ;
-
-    lda     dwellcrank_f
-    sta     dwelldms		       ; initial dwell period
-    mov     #$10,dwellush		   ;  high speed dwell delay,
-					               ; default of 4.1ms
-    clr     dwellusl		       ; } until calc in main loop
-    bset    SparkLSpeed,SparkBits; At boot turn on low speed ignition
-    clr     RevLimBits
-    clr     EnhancedBits
-    clr     EnhancedBits2
-    clr     EnhancedBits4
-    clr     EnhancedBits5
-    clr     EnhancedBits6
-    clr     coilsel
-    bset    coilabit,coilsel
-    bset    coilerr,RevLimBits	; set "error" bit so first coil found is used
-
-; possible that this calc could go wrong if a large "addition" was used but then a small
-; real angle. Shouldn't happen if angles set correctly.
-
-;*        lda     TriggAngle_f
-;*        cmp     #57T			; check for next cyl mode
-;*        bhi     init_crang		; trigger angle > 20, continue
+;possible that this calc could go wrong if a large "addition" was used but then a small
+;real angle. Shouldn't happen if angles set correctly.
+        lda     TriggAngle_f                       ;* TriggAngle_f = 227T (80 degrees)
+        cmp     #57T			; check for next cyl mode
+        bhi     init_crang		; trigger angle > 20, continue
 ;*        bset    nextcyl,EnhancedBits4
-;*init_crang:
-    lda     CrankAngle_f                    ;* CrankAngle_f = 10/.352=28
-    sta     SparkAngle
+init_crang:
+        lda     CrankAngle_f                   ;* CrankAngle_f = 10/.352=28 (10 degrees)
+        sta     SparkAngle
 ;*        brset   EDIS,personality,init_edis
 
 ;this won't work for next-cyl but will be ignored at low rpm anyway
-    lda     TriggAngle_f                    ;* = 80/.532=227
-    sub     CrankAngle_f                    ;* = 10/.352=28
-    add     #28T			                ;* A<-(A)+(M);* - - 10deg
-    sta     DelayAngle                      ;* 227-28=199+28=227 (80 degrees)
-    lda     SparkHoldCyc_f                  ;* = 3
-;*        bra     init_cont
+        lda     TriggAngle_f                  ;* TriggAngle_f = 227T (80 degrees)
+        sub     CrankAngle_f                 ;* CrankAngle_f = 10/.352=28 (10 degrees)
+        add     #28T			; - - 10deg
+        sta     DelayAngle
+        lda     SparkHoldCyc_f              ;* SparkHoldCyc_f = 0 (trigger signals)
+        bra     init_cont
 
 ;*init_edis:
 ;*        lda     TriggAngle_f
-;*       sta     DelayAngle
+;*        sta     DelayAngle
 ;*        lda     #$05			; set initial SAW to 10 degrees
 ;*        sta     sawh
 ;*        lda     #$00
 ;*        sta     sawl
 
-;*init_cont:
-    sta     wheelcount		; (HoldSpark)
-;*    brset   MSNEON,personality,init_wheel
-;*    brset   WHEEL,personality,init_wheel
-;*    bra     init_no_hold
-;*init_wheel:
-	mov     #WHEELINIT,wheelcount	; holdoff for Neon/Wheel  ;* WHEELINIT = %11000011, $C3, 195T
-    bclr    wsync,EnhancedBits6
-    bset    whold,EnhancedBits6
-    lda     #0
-    sta     avgtoothh
-    sta     avgtoothl
+init_cont:
+        sta     wheelcount		; (HoldSpark)
+;*        brset   MSNEON,personality,init_wheel        ;* MSNEON = 0
+;*        brset   WHEEL,personality,init_wheel         ;* WHEEL = 1
+;*        bra     init_no_hold
+init_wheel:
+	mov     #WHEELINIT,wheelcount	; holdoff for Neon/Wheel ;* WHEELINIT = %11000011, $C3, 195T
+        bclr    wsync,EnhancedBits6
+        bset    whold,EnhancedBits6
+        lda     #0
+        sta     avgtoothh
+        sta     avgtoothl
 ;if 2nd trig rising and falling then store existing value of pin to monitor state
 ;*        lda     dtmode_f
-;*        bit     #trig2risefallb
+;*        bit     #trig2risefallb                  ;* trig2risefallb = 0
 ;*        beq     init_no_hold
 ;*        brclr   pin11,portc,iw_rf2
 ;*        bset    rise,sparkbits
@@ -560,71 +570,72 @@ w_no3:
 
 ;*init_no_hold:
 
-    lda     #$FF
-    sta     iTimeH
-    sta     iTimeL
-    sta     iTimeX
+        lda     #$FF
+        sta     iTimeH
+        sta     iTimeL
+        sta     iTimeX
 
 ;see if inverted or non-inv output and use a quick bit
 ;*        lda     SparkConfig1_f		; check if noninv or inv spark
-;*        bit     #M_SC1InvSpark
+;*        bit     #M_SC1InvSpark                  ;* M_SC1InvSpark = 1
 ;*        bne     inspk_inv
 ;*        bclr    invspk,EnhancedBits4	; set non-inverted
 ;*        bra     inspk_done
-;*inspk_inv:
-    bset    invspk,EnhancedBits4	; set inverted
-;*inspk_done:
+inspk_inv:
+        bset    invspk,EnhancedBits4	; set inverted
+inspk_done:
 
 ;*        lda     p8feat1_f
-;*        bit     #rotary2b
+;*        bit     #rotary2b                         ;* rotary2b = 0
 ;*        beq     not_init_rot
 ;*        bset    rotary2,EnhancedBits5  ; set rotary quick bit
 ;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing normal wasted spark
 ;*        bra     done_rot
-;*not_init_rot:
+not_init_rot:
         bclr    rotary2,EnhancedBits5  ; clr rotary quick bit
 
-;*done_rot:
+done_rot:
 
 ;decide if we are doing multiple wasted spark outputs
-;*        brset   MSNEON,personality,wsp_init
-;*        brset   WHEEL,personality,wsp_init
+;*        brset   MSNEON,personality,wsp_init          ;* MSNEON = 0
+;*        brset   WHEEL,personality,wsp_init           ;* WHEEL = 1
 ;*        bra     mv_init			; not wasted spark so skip
-;*wsp_init:
-;*        brclr   REUSE_LED19,outputpins,mv_init
-;*        brset   rotary2,EnhancedBits5,mv_init
+wsp_init:
+;*        brclr   REUSE_LED19,outputpins,mv_init   ;* REUSE_LED19 = 1
+;*        brset   rotary2,EnhancedBits5,mv_init       ;* rotary2 = 0
         bset    wspk,EnhancedBits4	; set that we are doing wasted spark
-;*mv_init:
+mv_init:
 ; set MegaView mode to block enhanced comms, S,P,R,X commands reset
 ; it to allow normal ops
         bset    mv_mode,EnhancedBits2
 
-;*If HEI set bypass to 0v
-;*        brclr   HEI7,personality,not_hei7_init
- ;*       bset    aled,portc
-;*not_hei7_init:
+;If HEI set bypass to 0v
+;*        brclr   HEI7,personality,not_hei7_init    ;* HE17 = 0
+;*        bset    aled,portc
+not_hei7_init:
 
-;*        brclr   DUALEDIS,personality,chk_out
+;*        brclr   DUALEDIS,personality,chk_out        ;* DUALEDIS = 0
 ;*        bset    EDIS,personality	; DUALEDIS implies EDIS
+;***************************************************************************
 
-;*chk_out:
-;***** add in some sanity checks for outputs vs. code base ****
-;*        lda     personality
+chk_out:
+**** add in some sanity checks for outputs vs. code base ****
+;*        lda     personality                         ;* personality = 4T
 ;*        bne     check_out_config
-;        lda     outputpins		; assumes if personality zero
-;					; then any outputs are error
-;        beq     b_dc			; no personality, no outputs
-;wrong!  This prevents "Fuel only", just check for conflicts
- ;*       bra     check3
+;*;        lda     outputpins		; assumes if personality zero
+;*;					; then any outputs are error
+;*;        beq     b_dc			; no personality, no outputs
+;*;wrong!  This prevents "Fuel only", just check for conflicts
+;*        bra     check3
 
-;*set_error:
+;*;set_error:
 ;*        mov     #1,tmp4
 ;*        bset    config_error,feature2
 ;*        jmp     done_checks
 
 ;*check_out_config:
-;*        brclr   REUSE_LED17,outputpins,block_neon
-;*        brclr   REUSE_LED19,outputpins,block_neon
+;*        brclr   REUSE_LED17,outputpins,block_neon ;* REUSE_LED17 = 1
+;*        brclr   REUSE_LED19,outputpins,block_neon  ;* REUSE_LED19 = 1
 ;*        bra     check_msns
 ;*block_neon:
 ;*        brclr   MSNEON,personality,check_msns
@@ -634,7 +645,7 @@ w_no3:
 ;*        jmp     done_checks
 
 ;*check_msns:
-;*        brclr   MSNS,personality,check3
+;*        brclr   MSNS,personality,check3          ;* MSNS = 0
 ;*        brset   REUSE_FIDLE,outputpins,check3
 ;*        brset   REUSE_LED17,outputpins,check3
 ;*        mov     #3,tmp4
@@ -643,11 +654,11 @@ w_no3:
 ;*        jmp     done_checks
 
 ;*check3:   ; check for idle conflict
-;        brclr   PWMidle,feature2,check4
+;*;        brclr   PWMidle,feature2,check4
 ;*        lda     feature13_f
-;*        bit     #pwmidleb
+;*        bit     #pwmidleb                    ;* pwmidleb = 1
 ;*        beq     check4
-;*        brclr   REUSE_FIDLE,outputpins,check4
+;*        brclr   REUSE_FIDLE,outputpins,check4  ;* REUSE_FIDLE = 0
 ;*        mov     #4,tmp4
 ;*        bset    config_error,feature2	; trying to use PWM idle and spark
 ;*					; on FIDLE
@@ -655,36 +666,36 @@ w_no3:
 
 ;*check4:         ; check we don't have Water and Fan control as both use X2
 ;*        lda     feature3_f
-;*        bit     #WaterInjb
+;*        bit     #WaterInjb                        ;* WaterInjb = 0
 ;*        beq     check5
-;        brclr   WaterInj,feature3,check5
+;*;        brclr   WaterInj,feature3,check5
 ;*        brclr   X2_FAN,outputpins,check5
 ;*        mov     #5,tmp4
 ;*        bset    config_error,feature2	; X2 in conflict
 ;*b_dc:
-;*       jmp     done_checks
+;*        jmp     done_checks
 ;*check5:
-;*        brclr   Nitrous,feature1,check6
+;*        brclr   Nitrous,feature1,check6       ;* Nitrous = 0
 ;*        lda     feature3_f
 ;*        bit     #WaterInjb
 ;*        beq     check6
-;        brclr   WaterInj,feature3,check6
+;*;        brclr   WaterInj,feature3,check6
 ;*        mov     #6,tmp4
 ;*        bset    config_error,feature2	; X4 water/nitrous pin in conflict
 ;*        jmp     done_checks
 
 ;*check6:         ;7pin HEI must have spark output B (LED19) defined. For bypass output
-;*        brclr   HEI7,personality,check7
+;*        brclr   HEI7,personality,check7              ;*  HE17 = 0
 ;*        brset   REUSE_LED19,outputpins,check7
 ;*        mov     #7,tmp4
 ;*        bset    config_error,feature2
 ;*        jmp     done_checks
 
 ;*check7:   ; do some checks on wasted spark outputs
-;*        brset   rotary2,EnhancedBits5,check8a
-;  coilc is the pain - set if LED18=1 and LED18_2=1
+;*        brset   rotary2,EnhancedBits5,check8a      ;* rotary2 = 0
+;*;  coilc is the pain - set if LED18=1 and LED18_2=1
 ;*        brclr   wspk,EnhancedBits4,check8	; don't bother if we
-						; aren't doing multiple outputs
+;*						; aren't doing multiple outputs
 ;*        brclr   WHEEL,personality,check8
 ;*        brset   out3sparkd,feature2,ck74	; 4th output
 ;*        brclr   REUSE_LED18,outputpins,ck72	; not 3rd output
@@ -700,12 +711,12 @@ w_no3:
 ;*        beq     ck7err
 ;*        brclr   REUSE_LED19,outputpins,ck7err
 ;*ck72:
-;*        lda     trig2_f
+;*        lda     trig2_f                      ;* trig2_f = 19T
 ;*        beq     ck7err
 ;*ck72b:
-;*        brclr   REUSE_LED17,outputpins,ck7err
+;*        brclr   REUSE_LED17,outputpins,ck7err ;* REUSE_LED17 = 1
 ;*ck71:
-;*        lda     trig1_f
+;*        lda     trig1_f                         ;* trig1_f = 1T
 ;*        beq     ck7err
 ;*        bra     check7b				; passed all checks
 ;*ck7err:
@@ -713,25 +724,25 @@ w_no3:
 ;*        bset    config_error,feature2
 ;*        jmp     done_checks
 ;*check7b:	; can't use FIDLE for spark if doing wasted spark
-;*        brclr   REUSE_FIDLE,outputpins,check7c
+;*        brclr   REUSE_FIDLE,outputpins,check7c   ;* REUSE_FIDLE = 0
 ;*        mov     #9,tmp4
 ;*        bset    config_error,feature2
 ;*        jmp     done_checks
 
 ;*check7c:
-;now check other way around
-;first check for dual dizzy feature
+;*;now check other way around
+;*;first check for dual dizzy feature
 ;*        lda     feature6_f
-;*        bit     #dualdizzyb
+;*        bit     #dualdizzyb                        ;* dualdizzyb = 0
 ;*        bne     check8       ; if dual dizzy then only 2 outputs anyway
 
-;*        lda     trig4_f				; if trig4 pt set must have
-						; spark o/p d
+;*        lda     trig4_f	; if trig4 pt set must have        ;* trig4_f = 0
+;*						; spark o/p d
 ;*        beq     ck7c3
 ;*        brclr   out3sparkd,feature2,ck7err	; 4th output
 ;*ck7c3:
-;*        lda     trig3_f				; if trig3 pt set must
-						; have spark o/p c
+;*        lda     trig3_f				; if trig3 pt set must ;* trig3_f = 0
+;*						; have spark o/p c
 ;*        beq     check8
 ;*        brclr   REUSE_LED18,outputpins,ck7err
 ;*        brclr   REUSE_LED18_2,outputpins,ck7err
@@ -739,15 +750,15 @@ w_no3:
 ;*check8:
 ;*        bra     check9
 ;*check8a:
-        ; do rotary2 output checks, must have led17,18,19 set to spark and two
-        ; wheel triggers
+;*        ; do rotary2 output checks, must have led17,18,19 set to spark and two
+;*        ; wheel triggers
 ;*        brclr   REUSE_LED18,outputpins,ck8aerr
 ;*        brclr   REUSE_LED18_2,outputpins,ck8aerr
 ;*        brclr   REUSE_LED19,outputpins,ck8aerr
 ;*        brclr   REUSE_LED17,outputpins,ck8aerr
-;now check wheel decoder is setup
+;*;now check wheel decoder is setup
 ;*        brclr   WHEEL,personality,ck8cerr
-;check for two triggers
+;*;check for two triggers
 ;*        lda     trig2_f
 ;*        beq     ck8berr
 ;*        lda     trig1_f
@@ -757,7 +768,7 @@ w_no3:
 ;*ck8aerr:
 ;*        mov     #10T,tmp4
 ;*        bset    config_error,feature2
- ;*       bra     done_checks
+;*        bra     done_checks
 ;*ck8berr:
 ;*        mov     #11T,tmp4
 ;*        bset    config_error,feature2
@@ -768,76 +779,81 @@ w_no3:
 ;*        bra     done_checks
 
 ;*check9:
-;*        brclr   REUSE_FIDLE,outputpins,check10
+;*        brclr   REUSE_FIDLE,outputpins,check10     ;* REUSE_FIDLE = 0
 ;*        brclr   REUSE_LED17,outputpins,check10
 ;*        mov     #13T,tmp4
 ;*        bset    config_error,feature2
 ;*        bra     done_checks
 ;*check10:
-; count how many ignition types and if more than one give an error
+;*; count how many ignition types and if more than one give an error
 ;*        clra
-;*        brclr   MSNS,personality,check10a
+;*        brclr   MSNS,personality,check10a         ;* MSNS = 0
 ;*        inca
 ;*check10a:
-;*        brclr   MSNEON,personality,check10b
+;*        brclr   MSNEON,personality,check10b   ;* MSNEON = 0
 ;*        inca
 ;*check10b:
-;*        brclr   WHEEL,personality,check10c
+;*        brclr   WHEEL,personality,check10c    ;* WHEEL = 1
 ;*        inca
 ;*check10c:
-;*        brclr   EDIS,personality,check10d
+;*        brclr   EDIS,personality,check10d    ;* EDIS = 0
 ;*        inca
 ;*check10d:
-;*        brclr   TFI,personality,check10e
+;*        brclr   TFI,personality,check10e      ;* TFI = 0
 ;*        inca
 ;*check10e:
-;*        brclr   HEI7,personality,check10f
+;*        brclr   HEI7,personality,check10f        ;* HE17 = 0
 ;*        inca
 ;*check10f:
-;*      8 cmp     #1
+;*        cmp     #1
 ;*        bls     check11
 ;*        mov     #14T,tmp4
-;*     8  bset    config_error,feature2
+;*        bset    config_error,feature2
 ;*        bra     done_checks
 
 ;*check11:
 ;*done_checks:
-;make sure all spark outputs are inactive as soon as poss
+;*;make sure all spark outputs are inactive as soon as poss
 
         jsr     turnallsparkoff     ; subroutine
 
+start_adc:
 ; Fire up the ADC, and perform three conversions to get the baro value, IAT
 ; and the clt temp
 
-start_adc:
-	lda	  #%01110000	; Set up divide 8 and internal bus clock source
-	sta	  adclk
-	lda	  #%00000000	; Select one conversion, no interrupt, AD0
-	sta	  adscr
-	brclr coco,adscr,*	; wait until conversion is finished
-	lda	  adr
-	sta	  baro		    ; Store value in Barometer
-	lda	  #%00000010	; Select second conversion, no interrupt, AD2
-	sta	  adscr
-	brclr coco,adscr,*	; wait until conversion is finished
-	ldx   adr
-	lda   THERMFACTOR,x
-	sta   coolant		; Coolant temperature in degrees F + 40
-	lda	  #%00000011	; Select third conversion, no interrupt, AD3
-	sta	  adscr
-	brclr coco,adscr,*	; wait until conversion is finished
-	ldx   adr
-;*	lda   MATFACTOR,x
-    lda   THERMFACTOR,x
-    sta   airTemp
-	clr   adsel		; Clear the channel selector
+	lda	#%01110000	; Set up divide 8 and internal bus clock source
+	sta	adclk
+	lda	#%00000000	; Select one conversion, no interrupt, AD0
+	sta	adscr
+	brclr   coco,adscr,*	; wait until conversion is finished
 
+	lda	adr
+	sta	baro		; Store value in Barometer
+
+	lda	#%00000010	; Select second conversion, no interrupt, AD2
+	sta	adscr
+	brclr   coco,adscr,*	; wait until conversion is finished
+
+	ldx      adr
+	lda     THERMFACTOR,x
+	sta     coolant		; Coolant temperature in degrees F + 40
+
+	lda	#%00000011	; Select third conversion, no interrupt, AD3
+	sta	adscr
+	brclr   coco,adscr,*	; wait until conversion is finished
+
+	ldx      adr
+;*	lda     MATFACTOR,x
+	lda     THERMFACTOR,x   ;* MexACVW clt and mat sensors are the same
+        sta     airTemp
+	clr     adsel		; Clear the channel selector
 TURN_ON_INTS:
         cli			; Turn on all interrupts now
-***************************************************************************
-** Check for config error
-***************************************************************************
-;*        brset   config_error,feature2,config_er1JMP
+
+;****************************************************************************
+;*** Check for config error
+;****************************************************************************
+;*        brset   config_error,feature2,config_er1JMP    ;* config_error = 0
 
 ***************************************************************************
 **
@@ -846,32 +862,36 @@ TURN_ON_INTS:
 ** Also added the facility for 2 priming pulses  P Ringwood
 **
 ***************************************************************************
-;*    bclr   Primed,EnhancedBits	; Clear the primed bit
+;*        bclr   Primed,EnhancedBits		; Clear the primed bit
 ;*        lda    feature11_f4
-;*        bit    #PrimeTwiceb
+;*        bit    #PrimeTwiceb                          ;* PrimeTwiceb = 0
 ;*        bne    Two_Primes
-;*        brset  PrimeTwice,feature6,Two_Primes	; Are we firing priming
+;        brset  PrimeTwice,feature6,Two_Primes	; Are we firing priming
 						; pulses twice?
-;*    inc    TCSparkCut		; Add 1 to prime counter so it only does it once
+;*        inc    TCSparkCut	; Add 1 to prime counter ;* TCSparkCut initiialized at 0
+						; so it only does it once
 ;*Two_Primes:					; using spark cut byte to
 						; cut down bytes
 ;*        lda    feature11_f4
-;*        bit    #PrimeLateb
+;*        bit    #PrimeLateb                            ;* PrimeLateb = 0
 ;*        bne    PrimeLater
-;*        brset  PrimeLate,feature6,PrimeLater	; Are we going to prime late?
+;*;        brset  PrimeLate,feature6,PrimeLater	; Are we going to prime late?
 
 ;*PrimeNow:
-;*    inc    TCSparkCut			; Increase Prime Pulse Counter
-;*    lda    TCSparkCut
-;*    cmp    #02T				    ; Have we reached primepulse count limit?
-;*    blo    Prime_Not_Done
-;*    bset   Primed,EnhancedBits	; Set Primed bit high if we've done all pulses
-;*    lda    #00T
-;*    sta    TCSparkCut			; Clear this for use later
+;*        inc    TCSparkCut			; Increase Prime Pulse Counter
+;*        lda    TCSparkCut
+
+;*        cmp    #02T				; Have we reached prime
+						; pulse count limit?
+;*        blo    Prime_Not_Done
+;*        bset   Primed,EnhancedBits		; Set Primed bit high if
+						; we've done all pulses
+;*        lda    #00T
+;*        sta    TCSparkCut			; Clear this for use later
 
 ;*Prime_Not_Done:
 ;*        lda    feature11_f4                     ; Priming pulse table or box?
-;*        bit    #NoPrimePb
+;*        bit    #NoPrimePb                                      ;* NoPrimePb = 0
 ;*        beq    PrimeTable_P                     ; Prime table
 
 ;*        lda    primePulse_f                     ; Prime pulse
@@ -888,9 +908,9 @@ TURN_ON_INTS:
 ;*PrimeTable_P:
         ; Interpolate from CLT, same curve as cranking PW.
 
-    jsr    crankingModePrime
-    lda    tmp6
-    bra    prime
+        jsr    crankingModePrime
+        lda    tmp6
+;*        bra    prime
 
 ;*NotPrimed:					; If were here we must
 						; be priming late
@@ -906,22 +926,23 @@ TURN_ON_INTS:
 ;*        bset   fuelp,porta			; Start the pump running
 ;*        bra    CalcRunningParameters			; Don't pulse the injectors yet
 
-prime:
+;*prime:
 
-    bset   running,engine
-    bset   fuelp,porta
-    sta    pw1
-    clr    pwrun1
-    bset   sched1,squirt
-    bset   inj1,squirt
+        bset   running,engine
+        bset   fuelp,porta
 
-;*        brclr  CrankingPW2,feature1,CalcRunningParameters; can skip prime
+        sta    pw1
+        clr    pwrun1
+        bset   sched1,squirt
+        bset   inj1,squirt
+
+;*  brclr  CrankingPW2,feature1,CalcRunningParameters; can skip prime  ;* CrankingPW2 = 1
 						; on second channel
-    sta    pw2
-    clr    pwrun2
-    bset   sched2,squirt
-    bset   inj2,squirt
-    bra    CalcRunningParameters
+        sta    pw2
+        clr    pwrun2
+        bset   sched2,squirt
+        bset   inj2,squirt
+;*        bra    CalcRunningParameters
 
 ;*config_er1JMP:
 ;*        jmp   config_error1			; Config Error jump
@@ -932,24 +953,25 @@ prime:
 ;*        bset   fuelp,porta			; prime the pump
 ;*CalcRunJMP:
 ;*        bra    CalcRunningParameters            ; Go start the main loop
-******** Config error dead end **********
-** Toggle these ports as a visual and audible indicator
-***************************************************************************
+
+;********* Config error dead end **********
+;*** Toggle these ports as a visual and audible indicator
+;****************************************************************************
 ;*config_error1:
 ;*        bset    IMASK,INTSCR			; disable interrupts for
-						; IRQ (the ignition i/p)
+;*						; IRQ (the ignition i/p)
 ;*        bclr    running,engine
 ;*        bset    fuelp,porta
- ;*       bclr    wled,portc
-
-;dead_end:
+;*;        bclr    wled,portc
+;*
+;*dead_end:
 ;*        bset    fuelp,porta
 
 ;*        lda     tmp4
 ;*        beq     skip_err_msg			; if zero then don't try
-;*						; to send
+						; to send
 
-;find start address or error message
+;*;find start address or error message
 ;*        lda     tmp4
 ;*        asla
 ;*        tax
@@ -968,7 +990,7 @@ prime:
         ;if we keep sending it then it gets in the way of tuning software trying to
         ;read and write data to put the error right. e.g. you send 'R' but the code
         ;is in the middle of sending a message
-;skip_err_msg:
+;*skip_err_msg:
 
 ;*        mov     #10,tmp1
 ;*dead_loop1
@@ -983,7 +1005,7 @@ prime:
 ;*        dec     tmp1
 ;*        bne     dead_loop1
 
-;*       bclr    fuelp,porta
+;*        bclr    fuelp,porta
 
 ;*        mov     #10,tmp1
 ;*dead_loop4
@@ -993,13 +1015,12 @@ prime:
 ;*dead_loop6:
 ;*        dec     tmp3
 ;*        bne     dead_loop6
- ;*       dec     tmp2
+;*        dec     tmp2
 ;*        bne     dead_loop5
 ;*        dec     tmp1
 ;*        bne     dead_loop4
 
 ;*        bra     dead_end
-
 
 *****************************************************************************
 *****************************************************************************
@@ -1016,26 +1037,31 @@ prime:
 **    unsigned numbers for full temperature range of -40 to 215.
 **
 ***************************************************************************
-CalcRunningParameters:
 
-*******************************
+CalcRunningParameters:     ;* THIS IS THE START OF THE MAIN LOOP
+
+***************************************************************************
+
+        bra    CalcRunningParameters
         clrh
-        brset   OneShotBArro,EnhancedBits2,bEnd_of_Baro	; Only do this once
+        brset   OneShotBArro,EnhancedBits2,bEnd_of_Baro	; Only do this once  ;* OneShotBarro = 1
 							; as we may change
 							; the baro value
 
 
 ;*        lda     config13_f1           ; Are we doing baro at all?
-;*        bit     #c13_bc
+;*        bit     #c13_bc                           ;* c13_bc (bit3) = 1
 ;*        beq     non_baro
 
 ;*        lda     feature9_f
-;*        bit     #ConsBarCorb           ; Are we doing constant Bar COr using map on X7 ??
+;*        bit     #ConsBarCorb  ; Are we doing constant Bar COr using map on X7 ??  ;* ConsBaroCorb = 0
 ;*        bne     ConsBar
 
 ;*        lda     config13_f1
-;*        bit     #c13_cs                ; Are we doing Alpha_n?
+;*        bit     #c13_cs                ; Are we doing Alpha_n?     ;* c13_cs (bit2) = 0
 ;*        beq     OneShot_Bar            ; No so one shot baro only!
+
+         bra   OneShot_Bar
 
 ;*        lda     feature9_f             ; Are we doing constant baro correction using
 ;*        bit     #BaroCorConstb         ; the on board map in Alpha_n mode?
@@ -1050,7 +1076,7 @@ bEnd_of_Baro:
 ;*non_baro:
 ;*        bset    OneShotBArro,EnhancedBits2            ; only do this once
 
-        ; not doing any baro, so use fixed Pambient and 100% baro correction
+;*        ; not doing any baro, so use fixed Pambient and 100% baro correction
 ;*        lda     Pambient_f     ; load in flash data. Let the user choose the setpoint
 ;*        cmp     #20T
 ;*        bhi     st_pamb
@@ -1061,15 +1087,15 @@ bEnd_of_Baro:
 ;*        bra     DoneBaroCorr
 
 
-;*OneShot_Bar:
+OneShot_Bar:
         bset    OneShotBArro,EnhancedBits2
-;*        bra     DoBaroCorr
+        bra     DoBaroCorr
 
 ;*ConsBar:                                ; MAP connected to X7, so using constant BARO COR
 ;*        lda     o2_fpadc
 ;*        sta     baro
 
-;*DoBaroCorr:
+DoBaroCorr:
         ldx     baro
         ;check if within sensible range
         cpx     BarroHi_f
@@ -1149,11 +1175,11 @@ Donekpa:
 
         ldx     mat
 ;*        lda     MATFACTOR,x
-		lda     THERMFACTOR,x
+        lda     THERMFACTOR,x                   ;* MexACVW uses he same sensor for clt and mat
         sta     airTemp			; Added for enhanced stuff Air Temp in F + 40
 
 ;*        lda     feature9_f              ; Are we using a MAF?
-;*        bit     #MassAirFlwb
+;*        bit     #MassAirFlwb                                     ;* MassAirFlwb = 0
 ;*        beq     Do_AirDens
 ;*        lda     feature9_f              ; Using MAF, so do we still do Air Cor?
 ;*        bit     #NoAirFactorb
@@ -1163,13 +1189,13 @@ Donekpa:
 
 ;*Do_AirDens:                             ; Not using a Air correction within a MAF
 
-;******** CHECK IF CORRECTING AIR DENSITY *****************
+;*;******** CHECK IF CORRECTING AIR DENSITY *****************
 ;*        lda     feature13_f
-;*        bit     #cltMAPb             ; Are we correcting the air density factor?
+;*        bit     #cltMAPb             ; Are we correcting the air density factor?     ;* cltMAPb = 0
 ;*        beq     NormAirDen           ; If no then do normal air density
 
-; If we get here we are doing correction to air density
-; Air Density = IAT Air Density * (Correction * Reduction based on RPM %)
+;*; If we get here we are doing correction to air density
+;*; Air Density = IAT Air Density * (Correction * Reduction based on RPM %)
 
 ;*        ldhx    #CltMATRange         ; Temps for table
 ;*        sthx    tmp1
@@ -1209,8 +1235,8 @@ Donekpa:
 ;*        jsr     LinInterp
 ;*        mov     tmp6,tmp31           ; Tmp31 now contains correction percentage
 
-; So now we have the correction for Air Den, now interpolate the RPM to reduce this if needed due to engine speed
-; We do this by having 2 RPM set points, below Lowest is all of calculated coolant correction, above it is interpolated.
+;*; So now we have the correction for Air Den, now interpolate the RPM to reduce this if needed due to engine speed
+;*; We do this by having 2 RPM set points, below Lowest is all of calculated coolant correction, above it is interpolated.
 
 ;*        lda     rpm
 ;*  	cmp     RPMReduLo_f          ; Are we below the min reduction value?
@@ -1251,13 +1277,15 @@ Donekpa:
 ;*        bra     Do_Mat_Fact          ; jump past normal Air Density
 
 ;******** NORMAL AIR DENSITY **************************************
-NormAirDen:
+;*NormAirDen:
         ldx     mat
         lda     AIRDENFACTOR,x
 Store_AirCor:
         sta     AirCor			; Air Density Correction Factor
 
 ;*Do_Mat_Fact:
+
+
 
 ***************************************************************************
 **
@@ -1295,8 +1323,8 @@ dorpmCalc:
         mov       iTimepL,tmp17
         cli
 
-;*; If odd-fire is set (bit zero of Config13), then average RPM values
-;*        lda       config13_f1
+; If odd-fire is set (bit zero of Config13), then average RPM values
+;*        lda       config13_f1                  ;* bit zero of Config13 = 0
 ;*        and       #$01
 ;*        beq       NO_ODD_FIRE
 
@@ -1400,8 +1428,9 @@ rpmCalcDone:
 ***************************************************************************
 CalcPWs:
         lda     rpm
-        cmp     crankRPM_f		; Check if we are cranking,
-        bhi     runIt
+        cmp     crankRPM_f		; Check if we are cranking     ;* crankRPM_f = 3T (300 RPM)
+;        bhi     runIt          ;* doesn't branch until 4T
+        bhs     runIt           ;* branches at or above 3T
         brset    cant_crank,EnhancedBits2,runIt 	; don't allow reentry
 							; to crank mode while
 							; running
@@ -1424,8 +1453,8 @@ runIt:
 ; calc 'PW1' from table 1
 	bclr    page2,EnhancedBits4	; set table 1
 
-;*	brclr   UseVE3,EnhancedBits,Do_VE1_4_Now	; Jump if aren't using VE table 3
-;*        jmp     VE3_Table
+	brclr   UseVE3,EnhancedBits,Do_VE1_4_Now	; Jump if aren't using VE table 3
+        jmp     VE3_Table
 Do_VE1_4_Now:
 
 ***************************************************************************
@@ -1471,21 +1500,21 @@ VE1_LOOKUP:				; ALWAYS page 1
         clrh
         clrx
 
-;*        lda     feature9_f
-;*        bit     #MassAirFlwb
-;*        beq     VE1_LOOKUP_PW1          ; Are we using a MAF on pin X7?
-;*        lda     o2_fpadc                ; Using MAF thats on pin X7
-;*        bra     VE1_STEP_1
+        lda     feature9_f
+        bit     #MassAirFlwb
+        beq     VE1_LOOKUP_PW1          ; Are we using a MAF on pin X7?
+        lda     o2_fpadc                ; Using MAF thats on pin X7
+        bra     VE1_STEP_1
 
 VE1_LOOKUP_PW1:
-;*        lda     config13_f1
-;*        bit     #c13_cs
-;*        bne     VE1_AN			; Using Alpha_n?
+        lda     config13_f1
+        bit     #c13_cs
+        bne     VE1_AN			; Using Alpha_n?
         lda     kpa			; SD, so use kpa for load
-;*        bra     VE1_STEP_1
+        bra     VE1_STEP_1
 
-;*VE1_AN:
-;*        lda     tps                     ; Alpha_n
+VE1_AN:
+        lda     tps                     ; Alpha_n
 
 VE1_STEP_1:
         sta     kpa_n
@@ -1541,93 +1570,93 @@ VE1_STEP_3:
         jsr     VE_STEP_4
         mov     tmp6,vecurr
 
-;*	jmp     No_VE3
+	jmp     No_VE3
 
-;*VE3_Table:
-;*	lda     VE3Timer
-;*        beq     VE3_LOOKUP
-;*	jmp     Do_VE1_4_Now
+VE3_Table:
+	lda     VE3Timer
+        beq     VE3_LOOKUP
+	jmp     Do_VE1_4_Now
 ***************************************************************************
 *** VE Table 3 Look up
 ***************************************************************************
 
-;*VE3_LOOKUP:				; ALWAYS page 3
-;*        clrh
-;*        clrx
+VE3_LOOKUP:				; ALWAYS page 3
+        clrh
+        clrx
 
-;*        lda     feature9_f
-;*        bit     #MassAirFlwb
-;*        beq     VE3_LOOKUP_PW1          ; Are we using a MAF on pin X7?
+        lda     feature9_f
+        bit     #MassAirFlwb
+        beq     VE3_LOOKUP_PW1          ; Are we using a MAF on pin X7?
 
-;*        lda     o2_fpadc                ; Using MAF thats on pin X7
-;*        bra     VE3_STEP_1
+        lda     o2_fpadc                ; Using MAF thats on pin X7
+        bra     VE3_STEP_1
 
-;*VE3_LOOKUP_PW1:
-;*        lda     config13_f1
-;*        bit     #c13_cs
-;*        bne     VE3_AN			; if alpha-n
+VE3_LOOKUP_PW1:
+        lda     config13_f1
+        bit     #c13_cs
+        bne     VE3_AN			; if alpha-n
 
-;*        lda     kpa			; SD, so use kpa for load
-;*        bra     VE3_STEP_1
-;*VE3_AN:
-;*        lda     tps
+        lda     kpa			; SD, so use kpa for load
+        bra     VE3_STEP_1
+VE3_AN:
+        lda     tps
 
-;*VE3_STEP_1:
-;*        sta     kpa_n
-;*        ldhx    #KPARANGEVE_f3
-;*        sthx    tmp1
-;*        lda     #$0b			; 12x12
-;*        sta     tmp3
-;*        lda     kpa_n
-;*        sta     tmp4
-;*        jsr     tableLookup
-;*        lda     tmp1
-;*        lda     tmp2
-;*        mov     tmp5,tmp8		; Index
-;*        mov     tmp1,tmp9		; X1
-;*        mov     tmp2,tmp10		; X2
+VE3_STEP_1:
+        sta     kpa_n
+        ldhx    #KPARANGEVE_f3
+        sthx    tmp1
+        lda     #$0b			; 12x12
+        sta     tmp3
+        lda     kpa_n
+        sta     tmp4
+        jsr     tableLookup
+        lda     tmp1
+        lda     tmp2
+        mov     tmp5,tmp8		; Index
+        mov     tmp1,tmp9		; X1
+        mov     tmp2,tmp10		; X2
 
-;*VE3_STEP_2:
-;*        ldhx    #RPMRANGEVE_f3
-;*        sthx    tmp1
-;*        mov     #$0b,tmp3		; 12x12
-;*        mov     rpm,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp11		; Index
-;*        mov     tmp1,tmp13		; X1
-;*        mov     tmp2,tmp14		; X2
+VE3_STEP_2:
+        ldhx    #RPMRANGEVE_f3
+        sthx    tmp1
+        mov     #$0b,tmp3		; 12x12
+        mov     rpm,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp11		; Index
+        mov     tmp1,tmp13		; X1
+        mov     tmp2,tmp14		; X2
 
-;*VE3_STEP_3:
+VE3_STEP_3:
 
-;*        clrh
-;*        ldx     #$0c			; 12x12
-;*        lda     tmp8
-;*        deca
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        VE5X
-;*        sta     tmp15
-;*        incx
-;*        VE5X
-;*        sta     tmp16
-;*        ldx     #$0c			; 12x12
-;*        lda     tmp8
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        VE5X
-;*        sta     tmp17
-;*        incx
-;*        VE5X
-;*        sta     tmp18
+        clrh
+        ldx     #$0c			; 12x12
+        lda     tmp8
+        deca
+        mul
+        add     tmp11
+        deca
+        tax
+        VE5X
+        sta     tmp15
+        incx
+        VE5X
+        sta     tmp16
+        ldx     #$0c			; 12x12
+        lda     tmp8
+        mul
+        add     tmp11
+        deca
+        tax
+        VE5X
+        sta     tmp17
+        incx
+        VE5X
+        sta     tmp18
 
-;*        jsr     VE_STEP_4
-;*        mov     tmp6,vecurr
+        jsr     VE_STEP_4
+        mov     tmp6,vecurr
 
-;*No_VE3:
+No_VE3:
 
 CalcGammaE:
 
@@ -1711,15 +1740,15 @@ Warm_Done_Now:
         bset    FxdASEDone,EnhancedBits4
         bclr    startw,engine
         bclr    warmup,engine
-;*        brset   REUSE_LED18,outputpins,jWUE_DONE
-;*        brset   REUSE_LED18_2,outputpins,jWUE_DONE	; Using led as output 4
+        brset   REUSE_LED18,outputpins,jWUE_DONE
+        brset   REUSE_LED18_2,outputpins,jWUE_DONE	; Using led as output 4
         bclr    wled,portc		; not when crank sim or if
 					; LED re-used as IRQ indicator
 jWUE_DONE:
         jmp     WUE_DONE
 WUE2:
-;*        brset   REUSE_LED18,outputpins,WUE2_ledskip
-;*        brset   REUSE_LED18_2,outputpins,WUE2_ledskip ; Using led as output 4
+        brset   REUSE_LED18,outputpins,WUE2_ledskip
+        brset   REUSE_LED18_2,outputpins,WUE2_ledskip ; Using led as output 4
         bset    wled,portc
 WUE2_ledskip:
         brclr   startw,engine,jWUE_DONE
@@ -1728,28 +1757,28 @@ WUE2_ledskip:
 ; goes to the normal ASE decay type of ASE
 
 
-;*        lda     feature10_f5
-;*        bit     #ASEHoldb           ; Are we holding the ASE at a fixed percentage?
-;*        beq     NormASE_Count
-;*        brset   FxdASEDone,EnhancedBits4,NormASE_Count  ; If Fixed ASE done
+        lda     feature10_f5
+        bit     #ASEHoldb           ; Are we holding the ASE at a fixed percentage?
+        beq     NormASE_Count
+        brset   FxdASEDone,EnhancedBits4,NormASE_Count  ; If Fixed ASE done
 
-;*        lda     coolant             ; We are in fixed Accel mode
-;*        cmp     CltFixASE_f         ; so are we below the temperature setpoint?
-;*        blo     Cont_FixASE
-;*        bset    FxdASEDone,EnhancedBits4
-;*        bra     NormASE_Count
-;*Cont_FixASE:
-;*        lda     ASEcount
-;*        cmp     TimFixASE_f
-;*        blo     Table_ASEStuff      ; Have we passed the Fixed timer yet?
+        lda     coolant             ; We are in fixed Accel mode
+        cmp     CltFixASE_f         ; so are we below the temperature setpoint?
+        blo     Cont_FixASE
+        bset    FxdASEDone,EnhancedBits4
+        bra     NormASE_Count
+Cont_FixASE:
+        lda     ASEcount
+        cmp     TimFixASE_f
+        blo     Table_ASEStuff      ; Have we passed the Fixed timer yet?
 
-;*        clr     ASEcount            ; Reset ASE count so we do the norm ASE now  ????
-;*        bset    FxdASEDone,EnhancedBits4
-;*NormASE_Count:
+        clr     ASEcount            ; Reset ASE count so we do the norm ASE now  ????
+        bset    FxdASEDone,EnhancedBits4
+NormASE_Count:
         lda     ASEcount
         cmp     awc_f1			; Check if ASE period has expired.
         bhs     WUE3
-;*;        bra     Table_ASEStuff
+;        bra     Table_ASEStuff
 ; Table ASE stuff based on coolant temp - PR
 Table_ASEStuff:
         mov     coolant,tmp4
@@ -1781,11 +1810,11 @@ Table_ASEStuff:
         sta     liY1
         clr     liY2
         clr     liX
-;*        lda     feature10_f5
-;*        bit     #ASEHoldb
-;*        beq     NormASE_Interp
-;*        brclr   FxdASEDone,EnhancedBits4,All_ASECount
-;*NormASE_Interp:
+        lda     feature10_f5
+        bit     #ASEHoldb
+        beq     NormASE_Interp
+        brclr   FxdASEDone,EnhancedBits4,All_ASECount
+NormASE_Interp:
         mov     ASEcount,liX
 All_ASECount:
         jsr     LinInterp
@@ -1849,38 +1878,38 @@ WUE_DONE:
 **
 ***************************************************************************
 TAE_CALC:
-;*        lda     feature4_f
-;*        bit     #KpaDotSetb
-;*        beq     tps_dotty
-;*;        brclr   KpaDotSet,feature4,tps_dotty	; If not in KPA dot mode
+        lda     feature4_f
+        bit     #KpaDotSetb
+        beq     tps_dotty
+;        brclr   KpaDotSet,feature4,tps_dotty	; If not in KPA dot mode
 						; jump past KPa settings
-;*        bit     #KpaDotBoostb
-;*        beq     No_Boost_Chk
-;*;        brclr   KpaDotBoost,feature4,No_Boost_Chk; Are we going to stop
+        bit     #KpaDotBoostb
+        beq     No_Boost_Chk
+;        brclr   KpaDotBoost,feature4,No_Boost_Chk; Are we going to stop
 						; accel in boost?
-;*        lda     kpa
-;*        cmp     #100T
-;*        bhi     TAE_CHK_JMP1		; If KPa above 100 then no
+        lda     kpa
+        cmp     #100T
+        bhi     TAE_CHK_JMP1		; If KPa above 100 then no
 					; accel deccel enrichment
-;*No_Boost_Chk:
-;*        lda     feature9_f
-;*        bit     #NoAccelASEb                ; Are we Acceling during ASE?
-;*        beq     NoASE_Check_Accel
-;*        brset   startw,engine,TAE_CHK_JMP1  ; Is After Start Enrichment running?
+No_Boost_Chk:
+        lda     feature9_f
+        bit     #NoAccelASEb                ; Are we Acceling during ASE?
+        beq     NoASE_Check_Accel
+        brset   startw,engine,TAE_CHK_JMP1  ; Is After Start Enrichment running?
 
-;*NoASE_Check_Accel:
-;*        sei
-;*        mov     kpa,tmp1		; Load kpa into temp1
-;*        lda     TPSlast
-;*        sta     tmp2
-;*        cli
-;*        lda     tmp1
-;*        cmp     tmp2
-;*        bhi     AE_CHK
-;*        beq     Dec_Accel
-;*        jmp     TDE
+NoASE_Check_Accel:
+        sei
+        mov     kpa,tmp1		; Load kpa into temp1
+        lda     TPSlast
+        sta     tmp2
+        cli
+        lda     tmp1
+        cmp     tmp2
+        bhi     AE_CHK
+        beq     Dec_Accel
+        jmp     TDE
 
-;*tps_dotty:
+tps_dotty:
         sei
         mov     tps,tmp1
         lda     TPSlast
@@ -1904,17 +1933,17 @@ AE_CHK:
         mov     #100T,TPSfuelCorr
         sub     tmp2
         sta     tmp31
-;*        lda     feature4_f		; Are we in TPS or KPA mode?
-;*        bit     #KpaDotSetb
-;*        beq     tps_ThreshCheck
-;*        lda     tmp31
-;*        cmp     MAPthresh_f		; Are we above the Accel
-;*					; threshold for MAP?
-;*        bhs     AE_SET
-;*        brclr   TPSAEN,ENGINE,acc_done_led   ; If we are not in AE mode then jump to end
-;*        jmp     TAE_CHK_TIME            ; in AE mode so check timer
+        lda     feature4_f		; Are we in TPS or KPA mode?
+        bit     #KpaDotSetb
+        beq     tps_ThreshCheck
+        lda     tmp31
+        cmp     MAPthresh_f		; Are we above the Accel
+					; threshold for MAP?
+        bhs     AE_SET
+        brclr   TPSAEN,ENGINE,acc_done_led   ; If we are not in AE mode then jump to end
+        jmp     TAE_CHK_TIME            ; in AE mode so check timer
 
-;*tps_ThreshCheck:
+tps_ThreshCheck:
         lda     tmp31
         cmp     TPSthresh_f1		; Are we above the Accel
 					; threshold for TPS?
@@ -1926,38 +1955,38 @@ AE_SET:
         brset   TPSAEN,ENGINE,AE_COMP_SHOOT_AMT
 
 ; Add in accel enrichment
-;*        lda     feature9_f
-;*        bit     #RpmAEBased             ; This is a basic AE system that uses
-;*        beq     NormalBased_AE          ; RPM rather than dot
-;*        ldhx    #RPMbasedrate_f         ; Lets find out the actual AE with respects to RPM
-;*        sthx    tmp1
-;*        mov     #$03,tmp3
-;*        lda     rpm
-;*        sta     tmp4
-;*        sta     tmp10
-;*        jsr     tableLookup             ; Find the rpm bins we are going to use
-;*        clrh
-;*        ldx     tmp5
-;*        lda     RPMAQ_f2,x
-;*        sta     liY2
-;*        decx
-;*        lda     RPMAQ_f2,x
-;*        sta     liY1
-;*        mov     tmp10,liX
-;*        jsr     LinInterp
-;*        lda     tmp6
-;*        bra     Store_TEA1
+        lda     feature9_f
+        bit     #RpmAEBased             ; This is a basic AE system that uses
+        beq     NormalBased_AE          ; RPM rather than dot
+        ldhx    #RPMbasedrate_f         ; Lets find out the actual AE with respects to RPM
+        sthx    tmp1
+        mov     #$03,tmp3
+        lda     rpm
+        sta     tmp4
+        sta     tmp10
+        jsr     tableLookup             ; Find the rpm bins we are going to use
+        clrh
+        ldx     tmp5
+        lda     RPMAQ_f2,x
+        sta     liY2
+        decx
+        lda     RPMAQ_f2,x
+        sta     liY1
+        mov     tmp10,liX
+        jsr     LinInterp
+        lda     tmp6
+        bra     Store_TEA1
 
-;*NormalBased_AE:
-;*        lda     feature4_f
-;*        bit     #KpaDotSetb
-;*        beq     tps_FirstElem
-;*        lda     MAPAQ_f			; start out using first element
+NormalBased_AE:
+        lda     feature4_f
+        bit     #KpaDotSetb
+        beq     tps_FirstElem
+        lda     MAPAQ_f			; start out using first element
 					; - will determine actual next
 					; time around
-;*        bra     Store_TEA1
+        bra     Store_TEA1
 
-;*tps_FirstElem:
+tps_FirstElem:
         lda     TPSAQ_f1		; start out using first element
 					; - will determine actual next
 					; time around
@@ -1970,9 +1999,9 @@ RPMBackAE:
         clr     TPSACLK
         bset    TPSAEN,ENGINE
         bclr    TPSDEN,ENGINE
-;*        brset   REUSE_LED19,outputpins,acc_done_led	; LED already used
+        brset   REUSE_LED19,outputpins,acc_done_led	; LED already used
 							; in NEON as coilb
-;*        bset    aled,portc
+        bset    aled,portc
 acc_done_led:
         jmp     TAE_DONE
 TAE_CHK_JMP:
@@ -2029,42 +2058,42 @@ Warmup_OverAE:
         lda     #100T
         sta     tmp14
 AECarry_OnAE:
-;*        lda     feature9_f
-;*        bit     #RpmAEBased             ; This is a basic AE system that uses
-;*        beq     NotRPMBased             ; engine rpm instead of rate of change of tps
-;*        ldhx    #RPMbasedrate_f         ; or map. Amount added is rpm based.
-;*        sthx    tmp1
-;*        mov     #$03,tmp3
-;*        lda     rpm
-;*        sta     tmp4
-;*        sta     tmp10
-;*        jsr     tableLookup             ; Find the rpm bins we are going to use
-;*        clrh
-;*        ldx     tmp5
-;*        lda     RPMAQ_f2,x
-;*        sta     liY2
-;*        decx
-;*        lda     RPMAQ_f2,x
-;*        bra     Carry_On_TEA
+        lda     feature9_f
+        bit     #RpmAEBased             ; This is a basic AE system that uses
+        beq     NotRPMBased             ; engine rpm instead of rate of change of tps
+        ldhx    #RPMbasedrate_f         ; or map. Amount added is rpm based.
+        sthx    tmp1
+        mov     #$03,tmp3
+        lda     rpm
+        sta     tmp4
+        sta     tmp10
+        jsr     tableLookup             ; Find the rpm bins we are going to use
+        clrh
+        ldx     tmp5
+        lda     RPMAQ_f2,x
+        sta     liY2
+        decx
+        lda     RPMAQ_f2,x
+        bra     Carry_On_TEA
 
-;*NotRPMBased:
-;*        lda     feature4_f
-;*        bit     #KpaDotSetb
-;*        beq     tps_doty
+NotRPMBased:
+        lda     feature4_f
+        bit     #KpaDotSetb
+        beq     tps_doty
 
-;*; Now the amount based on MAPdot
-;*        ldhx    #MAPdotrate_f
-;*        sthx    tmp1
-;*        mov     #$03,tmp3
-;*        lda     kpa			; If not store KPa into last_tps
-;*        sub     TPSlast			;
-;*        sta     tmp4			; TPSDOT
-;*        sta     tmp10			; Save away for later use below
-;*        jsr     tableLookup
-;*        bra     miss_tps		; Jump past the tps checks
+; Now the amount based on MAPdot
+        ldhx    #MAPdotrate_f
+        sthx    tmp1
+        mov     #$03,tmp3
+        lda     kpa			; If not store KPa into last_tps
+        sub     TPSlast			;
+        sta     tmp4			; TPSDOT
+        sta     tmp10			; Save away for later use below
+        jsr     tableLookup
+        bra     miss_tps		; Jump past the tps checks
 
-;*; Now the amount based on TPSdot
-;*tps_doty:
+; Now the amount based on TPSdot
+tps_doty:
         ldhx    #TPSdotrate
         sthx    tmp1
         mov     #$03,tmp3
@@ -2077,17 +2106,17 @@ miss_tps:
         clrh
         ldx     tmp5
 
-;*        lda     feature4_f
-;*        bit     #KpaDotSetb
-;*        beq     TPS_Accel_AE
+        lda     feature4_f
+        bit     #KpaDotSetb
+        beq     TPS_Accel_AE
 
-;*        lda     MAPAQ_f,x		;MAP Based DOT
-;*        sta     liY2
-;*        decx
-;*        lda     MAPAQ_f,x
-;*        bra     Carry_On_TEA
+        lda     MAPAQ_f,x		;MAP Based DOT
+        sta     liY2
+        decx
+        lda     MAPAQ_f,x
+        bra     Carry_On_TEA
 
-;*TPS_Accel_AE:
+TPS_Accel_AE:
         lda     TPSAQ_f1,x		; TPS Based dot
         sta     liY2
         decx
@@ -2119,33 +2148,33 @@ TAE_CHK_TIME:
 
 ; MAP or TPS rate stable now so have we selected to interpolate the
 ; accel enrichments?
-;*        lda     feature8_f
-;*        bit     #InterpAcelb
-;*        bne     Decay_AE_Aw
+        lda     feature8_f
+        bit     #InterpAcelb
+        bne     Decay_AE_Aw
 
-;*        lda     feature9_f              ; We are not decaying AE but are we doing RPM based?
-;*        bit     #RpmAEBased             ; If we are in rpm AE mode then check
-;*        beq     TAE_DONEJ               ; rpm AE value as it may be lower than the
-;*        ldhx    #RPMbasedrate_f         ; earlier calculated stuff if rpm has increased.
-;*        sthx    tmp1
-;*        mov     #$03,tmp3
-;*        lda     rpm
-;*        sta     tmp4
-;*        sta     tmp10
-;*        jsr     tableLookup             ; Find the rpm bins we are going to use
-;*        clrh
-;*        ldx     tmp5
-;*        lda     RPMAQ_f2,x
-;*        sta     liY2
-;*        decx
-;*        lda     RPMAQ_f2,x
-;*        sta     liY1
-;*        mov     tmp10,liX
-;*        jsr     LinInterp
-;*        lda     tmp6
-;*        sta     TPSACCEL                ; Store new AE enrichment
-;*TAE_DONEJ:
-;*        jmp     TAE_DONE
+        lda     feature9_f              ; We are not decaying AE but are we doing RPM based?
+        bit     #RpmAEBased             ; If we are in rpm AE mode then check
+        beq     TAE_DONEJ               ; rpm AE value as it may be lower than the
+        ldhx    #RPMbasedrate_f         ; earlier calculated stuff if rpm has increased.
+        sthx    tmp1
+        mov     #$03,tmp3
+        lda     rpm
+        sta     tmp4
+        sta     tmp10
+        jsr     tableLookup             ; Find the rpm bins we are going to use
+        clrh
+        ldx     tmp5
+        lda     RPMAQ_f2,x
+        sta     liY2
+        decx
+        lda     RPMAQ_f2,x
+        sta     liY1
+        mov     tmp10,liX
+        jsr     LinInterp
+        lda     tmp6
+        sta     TPSACCEL                ; Store new AE enrichment
+TAE_DONEJ:
+        jmp     TAE_DONE
 
 Higher_AcJMP:
         bra     Higher_Accel
@@ -2153,8 +2182,8 @@ Higher_AcJMP:
 RST_ACCJMP:
         bra     RST_ACCEL
 
-;*; Decay the Accel enrichment away to a setpoint in the time period set - Phil
-;*Decay_AE_Aw:
+; Decay the Accel enrichment away to a setpoint in the time period set - Phil
+Decay_AE_Aw:
         lda     AccelDecay_f
         cmp     TPSACCEL		; Only do interpolated Decay if
 					; Accel is higher than target point
@@ -2176,30 +2205,30 @@ RST_ACCJMP:
         lda     tmp6
         sta     tmp31                   ; Save true result for a moment
 
-;*        lda     feature9_f
-;*        bit     #RpmAEBased             ; If we are in rpm AE mode then check
-;*        beq     NormAEMode              ; rpm AE value as it may be lower than the
-;*        ldhx    #RPMbasedrate_f         ; Decay value.
-;*        sthx    tmp1
-;*        mov     #$03,tmp3
-;*        lda     rpm
-;*        sta     tmp4
-;*        sta     tmp10
-;*        jsr     tableLookup             ; Find the rpm bins we are going to use
-;*        clrh
-;*        ldx     tmp5
-;*        lda     RPMAQ_f2,x
-;*        sta     liY2
-;*        decx
-;*        lda     RPMAQ_f2,x
-;*        sta     liY1
-;*        mov     tmp10,liX
-;*        jsr     LinInterp
-;*        lda     tmp6
-;*        cmp     tmp31                   ; Is the RPM value lower than the
-;*        blo     StoreTPSACCEL           ; AE value? tmp6 < tmp31 ?
+        lda     feature9_f
+        bit     #RpmAEBased             ; If we are in rpm AE mode then check
+        beq     NormAEMode              ; rpm AE value as it may be lower than the
+        ldhx    #RPMbasedrate_f         ; Decay value.
+        sthx    tmp1
+        mov     #$03,tmp3
+        lda     rpm
+        sta     tmp4
+        sta     tmp10
+        jsr     tableLookup             ; Find the rpm bins we are going to use
+        clrh
+        ldx     tmp5
+        lda     RPMAQ_f2,x
+        sta     liY2
+        decx
+        lda     RPMAQ_f2,x
+        sta     liY1
+        mov     tmp10,liX
+        jsr     LinInterp
+        lda     tmp6
+        cmp     tmp31                   ; Is the RPM value lower than the
+        blo     StoreTPSACCEL           ; AE value? tmp6 < tmp31 ?
 
-;*NormAEMode:
+NormAEMode:
         lda     tmp31
 
 StoreTPSACCEL:
@@ -2225,13 +2254,13 @@ RST_ACCEL:
 
 ; deaccel
 TDE:
-;*        lda     feature6_f
-;*        bit     #NoDecelBoostb		; Have we selected to use Decel
+        lda     feature6_f
+        bit     #NoDecelBoostb		; Have we selected to use Decel
 					; all the time?
-;*        beq     NormDecel
-;*        lda     kpa
-;*        cmp     DecelKpa_f
-;*        bhi     TAE_DONE		; If KPa above user defined amount
+        beq     NormDecel
+        lda     kpa
+        cmp     DecelKpa_f
+        bhi     TAE_DONE		; If KPa above user defined amount
 					; then no decel enrichment
 
 NormDecel:
@@ -2239,14 +2268,14 @@ NormDecel:
         lda     tmp2
         sub     tmp1
         sta     tmp31
-;*        lda     feature4_f		; Are we in TPS or KPA mode?
-;*        bit     #KpaDotSetb
-;*        beq     tps_Decell
-;*        lda     tmp31
-;*        cmp     MAPthresh_f
-;*        blo     TDE_CHK_DONE
-;*        brclr   TPSAEN,ENGINE,TDE_CHK_FUEL_CUT
-;*        bra     Clear_Decel
+        lda     feature4_f		; Are we in TPS or KPA mode?
+        bit     #KpaDotSetb
+        beq     tps_Decell
+        lda     tmp31
+        cmp     MAPthresh_f
+        blo     TDE_CHK_DONE
+        brclr   TPSAEN,ENGINE,TDE_CHK_FUEL_CUT
+        bra     Clear_Decel
 
 tps_Decell:
         lda     tmp31
@@ -2260,8 +2289,8 @@ Clear_Decel:
         clr     Decay_Accel
         bclr    TPSAEN,ENGINE
         bclr    TPSDEN,ENGINE
-;*        brset   REUSE_LED19,outputpins,TAE_DONE
-;*        bclr    aled,portc		; not in Neon
+        brset   REUSE_LED19,outputpins,TAE_DONE
+        bclr    aled,portc		; not in Neon
         bra     TAE_DONE
 
 TDE_CHK_FUEL_CUT:
@@ -2277,11 +2306,11 @@ CheckDecelT:				; New decel timer
         sta     TPSfuelCorr
         lda     TPSaclk                 ; Use accel timer for decel timer
         cmp     TPSASYNC_f1
-;*    ;    cmp     #2T                     ; Have we deceled for 200mSec?
+    ;    cmp     #2T                     ; Have we deceled for 200mSec?
         bhs     Clear_Decel
 
-;*        brset   REUSE_LED19,outputpins,TAE_DONE
-;*        bclr    aled,portc		; not in Neon
+        brset   REUSE_LED19,outputpins,TAE_DONE
+        bclr    aled,portc		; not in Neon
         bra     TAE_DONE
 
 TDE_CHK_DONE:
@@ -2328,23 +2357,23 @@ TAE_DONE:
 ***************************************************************************
 
 EGO_CALC:
-;*         lda     feature3_f
-;*         bit     #WaterInjb
-;*         beq     no_ego_w_chk
-;*;        brclr   WaterInj,feature3,no_ego_w_chk
-;*        brset   water,porta,SKIP_ALL_O2	; if water injection on
+         lda     feature3_f
+         bit     #WaterInjb
+         beq     no_ego_w_chk
+;        brclr   WaterInj,feature3,no_ego_w_chk
+        brset   water,porta,SKIP_ALL_O2	; if water injection on
 					; skip both O2 checks
-;*no_ego_w_chk:
-;*        brset   NosSysOn,EnhancedBits,SKIP_ALL_O2; If NOS running then no
+no_ego_w_chk:
+        brset   NosSysOn,EnhancedBits,SKIP_ALL_O2; If NOS running then no
 					;O2 checks
         brset   OverRun,EnhancedBits,SKIP_ALL_O2; Skip O2 if in Overrun mode
         lda     EGOdelta_f		; No delta means open loop.
         beq     SkipO2JMP
 
-;*         lda     feature3_f
-;*         bit     #KPaTpsOpenb
-;*         beq     throttle_check
-;*;        brclr KPaTpsOpen,feature3,throttle_check	; 0 = throttle do
+         lda     feature3_f
+         bit     #KPaTpsOpenb
+         beq     throttle_check
+;        brclr KPaTpsOpen,feature3,throttle_check	; 0 = throttle do
 					; throttle check  1 = KPa
         lda   kpaO2_f			; In KPa mode so is it higher
 					; than setpoint?
@@ -2355,14 +2384,14 @@ EGO_CALC:
 No_KPA_Check:
         bra   SETAFR_UP
 
-;*throttle_check:
-;*	  lda	  tpsO2_f		; Throttle position setpoint
+throttle_check:
+	  lda	  tpsO2_f		; Throttle position setpoint
 					; check for open loop
-;*          beq     SETAFR_UP		; If its zero dont check it
+          beq     SETAFR_UP		; If its zero dont check it
 					; as no open loop
-;*	  cmp	  tps			; Load in TPS
-;*	  blo	  SKIP_ALL_O2
-;*          bra     SETAFR_UP
+	  cmp	  tps			; Load in TPS
+	  blo	  SKIP_ALL_O2
+          bra     SETAFR_UP
 
 SkipO2JMP:
          bra    SKIPO2A
@@ -2374,33 +2403,33 @@ SKIP_ALL_O2:				; Skip both O2 checks
          jmp    EGOALL_DONE
 
 SETAFR_UP:
-;*         lda     feature3_f
-;*         bit     #TargetAFRb
-;*         bne     CheckVE1
-;*;        brset   TargetAFR,feature3,CheckVE1	; Target AFR?
+         lda     feature3_f
+         bit     #TargetAFRb
+         bne     CheckVE1
+;        brset   TargetAFR,feature3,CheckVE1	; Target AFR?
 
-;*Re_CheckTarg:
-;*         lda     feature6_f
-;*         bit     #TargetAFR3b
-;*         bne     CheckVE3
-;*;        brset   TargetAFR3,feature6,CheckVE3
-;*        jmp     SETAFRNORMAL
+Re_CheckTarg:
+         lda     feature6_f
+         bit     #TargetAFR3b
+         bne     CheckVE3
+;        brset   TargetAFR3,feature6,CheckVE3
+        jmp     SETAFRNORMAL
 
-;*CheckVE1:
-;*         brset  useVE3,EnhancedBits,Re_CheckTarg; Are we are using VE3
-;*						; at present if so check
-;*						; if targets needed?
-;*         bra    SETAFRTABLE
+CheckVE1:
+         brset  useVE3,EnhancedBits,Re_CheckTarg; Are we are using VE3
+						; at present if so check
+						; if targets needed?
+         bra    SETAFRTABLE
 
-;*CheckVE3:
-;*         brset  useVE3,EnhancedBits,SETAFRTABLE	; If were not running in
+CheckVE3:
+         brset  useVE3,EnhancedBits,SETAFRTABLE	; If were not running in
 						; VE3 then no targets
 
-;*SETAFRNORMAL:				; Normal setting for AFR
-;*        lda     O2targetV_f
-;*        sta     afrTarget
+SETAFRNORMAL:				; Normal setting for AFR
+        lda     O2targetV_f
+        sta     afrTarget
 
-;*SETAFRTABLE:				; AFR Table value is already in
+SETAFRTABLE:				; AFR Table value is already in
 					; afrTarget
         lda     ego
         sta     tmp32			; Make tmp32 = the ego raw adc
@@ -2409,7 +2438,7 @@ SETAFR_UP:
 AFTERAFRSET:
         brset   TPSAEN,ENGINE,Skip_ALL_O2
         brset   TPSDEN,ENGINE,Skip_ALL_O2
-;*        brset   Traction,EnhancedBits2,Skip_ALL_O2
+        brset   Traction,EnhancedBits2,Skip_ALL_O2
 
         lda     sech
         bne     chk_o2_lag		; if high seconds set then we
@@ -2451,21 +2480,21 @@ New_EgoLim:
         sta     tmp31
 EgoLim_Done:
 
-;*        lda     config13_f1		; Check if Narrow-band (bit=0)
+        lda     config13_f1		; Check if Narrow-band (bit=0)
 					; or DIY-WB (bit=1)
-;*        bit     #c13_o2			; Use BIT instead of brset
+        bit     #c13_o2			; Use BIT instead of brset
 					; because outside of zero-page
-;*        bne     WBO2TYPE		; Branch if the bit is set
-;*NBO2TYPE:
-;*        lda     tmp32			; EGO
-;*        cmp     afrTarget
-;*        blo     O2_IS_LEAN
-;*        bra     O2_IS_RICH
+        bne     WBO2TYPE		; Branch if the bit is set
+NBO2TYPE:
+        lda     tmp32			; EGO
+        cmp     afrTarget
+        blo     O2_IS_LEAN
+        bra     O2_IS_RICH
 
 SkipO2A:				; Jmp for Skip O2
         bra     SkipO2
 
-;*WBO2TYPE:
+WBO2TYPE:
         lda     tmp32
         cmp     afrTarget
         bhi     O2_IS_LEAN
@@ -2504,13 +2533,13 @@ SkipO2:
         lda     #100T
         sta     EGOcorr
 EGO_DONE:
-;*        lda       DTmode_f		; check if DT in use
-;*        bit       #alt_i2t2
-;*        beq      No_DT_SecondO2
-;*        lda     feature12_f2
-;*        bit     #SecondO2b
-;*        bne     DO_Second_Ego
-;*;        brset    SecondO2,feature4,DO_Second_Ego	; Do we have a second
+        lda       DTmode_f		; check if DT in use
+        bit       #alt_i2t2
+        beq      No_DT_SecondO2
+        lda     feature12_f2
+        bit     #SecondO2b
+        bne     DO_Second_Ego
+;        brset    SecondO2,feature4,DO_Second_Ego	; Do we have a second
                                                         ; O2 sensor?
 No_DT_SecondO2:
         lda     Egocorr
@@ -2520,112 +2549,112 @@ EGOALL_DONE:
 
 ;Second O2 Sensor runs from Page2 Enrichments
 
-;*DO_Second_Ego:
-;*        clr     EGOcount
+DO_Second_Ego:
+        clr     EGOcount
 
-;*        lda     rpm			; Over EGOrpm we go closed loop.
-;*        cmp     EGOrpm_f2
-;*        blo     SkipO22
-;*        lda     coolant
-;*        cmp     EGOtemp_f2
-;*        blo     SkipO22
+        lda     rpm			; Over EGOrpm we go closed loop.
+        cmp     EGOrpm_f2
+        blo     SkipO22
+        lda     coolant
+        cmp     EGOtemp_f2
+        blo     SkipO22
 
-;*         lda     feature3_f
-;*         bit     #TargetAFRb
-;*         bne     Check2VE1
-;*;        brset   TargetAFR,feature3,Check2VE1	; Target AFR?
+         lda     feature3_f
+         bit     #TargetAFRb
+         bne     Check2VE1
+;        brset   TargetAFR,feature3,Check2VE1	; Target AFR?
 
-;*Re_Check2Targ:
-;*         lda     feature6_f
-;*         bit     #TargetAFR3b
-;*         bne     Check2VE3
-;*;        brset   TargetAFR3,feature6,Check2VE3
-;*        jmp     SETAFRNORMAL2
+Re_Check2Targ:
+         lda     feature6_f
+         bit     #TargetAFR3b
+         bne     Check2VE3
+;        brset   TargetAFR3,feature6,Check2VE3
+        jmp     SETAFRNORMAL2
 
-;*Check2VE1:
-;*         brset  useVE3,EnhancedBits,Re_Check2Targ	; Are we are using
+Check2VE1:
+         brset  useVE3,EnhancedBits,Re_Check2Targ	; Are we are using
 							; VE3 at present if
 							; so check if targets
 							; needed?
-;*         bra    SETAFRTABLE2
+         bra    SETAFRTABLE2
 
-;*Check2VE3:
-;*         brset  useVE3,EnhancedBits,SETAFRTABLE2	; If were not running
+Check2VE3:
+         brset  useVE3,EnhancedBits,SETAFRTABLE2	; If were not running
 							; in VE3 then no
 							; targets
 
-;*SETAFRNORMAL2:				; Normal setting for AFR
-;*        lda     O2targetV_f2
-;*        sta     afrTarget
+SETAFRNORMAL2:				; Normal setting for AFR
+        lda     O2targetV_f2
+        sta     afrTarget
 
-;*SETAFRTABLE2:
-;*        lda     o2_fpadc
-;*        sta     tmp32
+SETAFRTABLE2:
+        lda     o2_fpadc
+        sta     tmp32
 
-;*AFTERAFRSET2:
-;*        lda     kpa			; See if we need to load in a
+AFTERAFRSET2:
+        lda     kpa			; See if we need to load in a
 					; new Ego Limit
-;*        cmp     EgoLimitKPa_f
-;*        bhi     EgoLim2_New
-;*        lda     EGOlimit_f2		; Original Ego Limit from page 2
-;*        sta     tmp31			; We can re-use this as its
+        cmp     EgoLimitKPa_f
+        bhi     EgoLim2_New
+        lda     EGOlimit_f2		; Original Ego Limit from page 2
+        sta     tmp31			; We can re-use this as its
 					; reset every time
-;*        bra     EgoLim2_Done
+        bra     EgoLim2_Done
 
-;*EgoLim2_New:
-;*        lda     EgoLim2_f		; New Ego Limit
-;*        sta     tmp31
+EgoLim2_New:
+        lda     EgoLim2_f		; New Ego Limit
+        sta     tmp31
 
-;*EgoLim2_Done:
+EgoLim2_Done:
 
-;*        lda     config13_f2		; Check if Narrow-band (bit=0)
+        lda     config13_f2		; Check if Narrow-band (bit=0)
 					; or DIY-WB (bit=1)
-;*        bit     #c13_o2			; Use BIT instead of brset because
+        bit     #c13_o2			; Use BIT instead of brset because
 					; outside of zero-page
-;*        bne     WBO2TYPE2		; Branch if the bit is set
-;*NBO2TYPE2:
-;*        lda     tmp32			; ADC from Second O2
-;*        cmp     afrTarget
-;*        blo     O2_IS_LEANER
-;*        bra     O2_IS_RICHER
+        bne     WBO2TYPE2		; Branch if the bit is set
+NBO2TYPE2:
+        lda     tmp32			; ADC from Second O2
+        cmp     afrTarget
+        blo     O2_IS_LEANER
+        bra     O2_IS_RICHER
 
-;*WBO2TYPE2:
-;*        lda     tmp32
-;*        cmp     afrTarget
-;*        bhi     O2_IS_LEANER
+WBO2TYPE2:
+        lda     tmp32
+        cmp     afrTarget
+        bhi     O2_IS_LEANER
 
 ; rich o2 - lean out EGOcorr2
-;*O2_IS_RICHER:
-;*        lda     #100T
-;*        sub     tmp31			; Generate the lower limit rail point
-;*        sta     tmp2
-;*        lda     EgoCorr2
-;*        sub     EGOdelta_f2
-;*        sta     tmp1
-;*        cmp     tmp2
-;*        blo     EGO_2Done		; railed at EGOlimit value
-;*        lda     tmp1
-;*        sta     EgoCorr2
-;*EGO_2DoneJMP:
-;*        bra     EGO_2Done
+O2_IS_RICHER:
+        lda     #100T
+        sub     tmp31			; Generate the lower limit rail point
+        sta     tmp2
+        lda     EgoCorr2
+        sub     EGOdelta_f2
+        sta     tmp1
+        cmp     tmp2
+        blo     EGO_2Done		; railed at EGOlimit value
+        lda     tmp1
+        sta     EgoCorr2
+EGO_2DoneJMP:
+        bra     EGO_2Done
 
-;*SkipO22:
-;*        lda     #100T
-;*        sta     EgoCorr2
-;*        bra     EGO_2Done
+SkipO22:
+        lda     #100T
+        sta     EgoCorr2
+        bra     EGO_2Done
 
-;*; lean o2 - richen EGOcorr2
-;*O2_IS_LEANER:
-;*        lda     #100T
-;*        add     tmp31			; Generate the upper limit rail point
-;*        sta     tmp2
-;*        lda     EgoCorr2
-;*        add     EGOdelta_f2
-;*        sta     tmp1
-;*        cmp     tmp2
-;*        bhi     EGO_2Done		; railed at EGOlimit value
-;*        lda     tmp1
-;*        sta     EgoCorr2
+; lean o2 - richen EGOcorr2
+O2_IS_LEANER:
+        lda     #100T
+        add     tmp31			; Generate the upper limit rail point
+        sta     tmp2
+        lda     EgoCorr2
+        add     EGOdelta_f2
+        sta     tmp1
+        cmp     tmp2
+        bhi     EGO_2Done		; railed at EGOlimit value
+        lda     tmp1
+        sta     EgoCorr2
 EGO_2Done:
 
 ***************************************************************************
@@ -2686,12 +2715,12 @@ WARMACCEL_COMP:
         mov     tmp10,tmp5		; save whole result into tmp5
         mov     tmp11,tmp6		; save remainder into tmp6
 
-;*        lda     DTmode_f		; Must check the INJ1 GammaE bit,
-;*        bit     #alt_i1ge		; if 0 then set it to 100T to
-;*					; remove GammaE.
-;*        bne     ld_ve_1
-;*        mov     #100T,GammaE
-;*        bra     ld_ve_1Done
+        lda     DTmode_f		; Must check the INJ1 GammaE bit,
+        bit     #alt_i1ge		; if 0 then set it to 100T to
+					; remove GammaE.
+        bne     ld_ve_1
+        mov     #100T,GammaE
+        bra     ld_ve_1Done
 
 ld_ve_1:
         mov     tmp10,GammaE
@@ -2701,21 +2730,21 @@ ld_ve_1Done:
 					; into tmp10
         clr     tmp11			; remainder is zero
 
-;*        brset  hybridAlphaN,feature1,skip_loadcontcomp	; if hybrid then
+        brset  hybridAlphaN,feature1,skip_loadcontcomp	; if hybrid then
 							; skip AN bypass
 
-;*        lda    config13_f1
-;*        bit     #c13_cs
-;*        beq     MAFCheck                ; No Alpha but are we using MAF?
-;*        bra     LoadContribDone
+        lda    config13_f1
+        bit     #c13_cs
+        beq     MAFCheck                ; No Alpha but are we using MAF?
+        bra     LoadContribDone
 
-;*MAFCheck:
-;*        lda     feature9_f
-;*        bit     #MassAirFlwb
-;*        beq     skip_loadcontcomp       ; Are we using a MAF on pin X7?
-;*        bra     LoadContribDone
+MAFCheck:
+        lda     feature9_f
+        bit     #MassAirFlwb
+        beq     skip_loadcontcomp       ; Are we using a MAF on pin X7?
+        bra     LoadContribDone
 
-;*skip_loadcontcomp:
+skip_loadcontcomp:
         mov     kpa,tmp12		; MAP into tmp12
         clr     tmp13			; no remainder
         jsr     Supernorm		; do the multiply and divide
@@ -2749,7 +2778,7 @@ rqfe1:
         jsr     Supernorm		; multiply/divide
         mov     tmp10,tmp11
 
-;*;	jsr     BATT_CORR_CALC		; result in tmp6  <- f(Vbatt)
+;	jsr     BATT_CORR_CALC		; result in tmp6  <- f(Vbatt)
 
 
 ***************************************************************************
@@ -2801,29 +2830,29 @@ MBFF:
 * Check if 300kpa or 400kpa map sensor
 ***************************************************************************
 
-;*        lda     config11_f1
-;*        and     #$03
-;*        cmp     #$02			; Are we using Turbo Map sensor?
-;*        blo     CALC_FINAL    ; skip if 0 or 1
+        lda     config11_f1
+        and     #$03
+        cmp     #$02			; Are we using Turbo Map sensor?
+        blo     CALC_FINAL    ; skip if 0 or 1
 
 ; If we get here we are using non-standard map sensor
 ; so do kpa * compensation factor to work out larger kpa
 ; value then add it back to the normal kpa cals later
 
-;*        cbeqa   #2T,mul300
-;*        ldx     #KPASCALE400
-;*        bra     lcd_cont
-;*mul300:
-;*        ldx     #KPASCALE300
-;*lcd_cont:
-;*        lda     tmp11
-;*        mul
-;*        txa
-;*        add     tmp11
-;*        bcc     Store_Mod_KPa1
-;*        lda     #255T           ; Limit
-;*Store_Mod_KPa1:
-;*        sta     tmp11
+        cbeqa   #2T,mul300
+        ldx     #KPASCALE400
+        bra     lcd_cont
+mul300:
+        ldx     #KPASCALE300
+lcd_cont:
+        lda     tmp11
+        mul
+        txa
+        add     tmp11
+        bcc     Store_Mod_KPa1
+        lda     #255T           ; Limit
+Store_Mod_KPa1:
+        sta     tmp11
 
 
 ***************************************************************************
@@ -2855,192 +2884,192 @@ MaxPulse:
 PW_Done:
 
         sta     tmp20
-;*        lda     feature5_f
-;*        bit     #stagedeither
-;*        beq     Calc_Final1Done
-;*        jsr     CALC_STAGED_PW   ; Do the Staged PW calculations if set
-;*Calc_Final1Done:
+        lda     feature5_f
+        bit     #stagedeither
+        beq     Calc_Final1Done
+        jsr     CALC_STAGED_PW   ; Do the Staged PW calculations if set
+Calc_Final1Done:
 ****************************************************************************
 
 
 	mov     tmp20,tmp1		; store PW from table 1
-;*	lda     DTmode_f
-;*	bit     #alt_i2t2
-;*	bne     do_dt
+	lda     DTmode_f
+	bit     #alt_i2t2
+	bne     do_dt
         jmp     both_table1		; if (inj2=t2) =0 then single table
 
-;*do_dt:
-;*; calc 'PW2' from table 2
-;*        mov     tmp20,tmp22		; storage for PW1 whilst doing DT
-;*        bset    page2,EnhancedBits4	; set page2
+do_dt:
+; calc 'PW2' from table 2
+        mov     tmp20,tmp22		; storage for PW1 whilst doing DT
+        bset    page2,EnhancedBits4	; set page2
 ***************************************************************************
 ** Maybe lazy, but we have lots of flash, so quicker to have one
 ** routine per page
 ***************************************************************************
-;*VE2_LOOKUP:				; ALWAYS page 2
- ;*       clrh
-;*        clrx
+VE2_LOOKUP:				; ALWAYS page 2
+        clrh
+        clrx
 
-;*        lda     feature9_f
-;*        bit     #MassAirFlwb
-;*        beq     VE2_LOOKUP_PW1          ; Are we using a MAF on pin X7?
-;*        lda     o2_fpadc                ; Using MAF thats on pin X7
-;*        bra     VE2_STEP_1
+        lda     feature9_f
+        bit     #MassAirFlwb
+        beq     VE2_LOOKUP_PW1          ; Are we using a MAF on pin X7?
+        lda     o2_fpadc                ; Using MAF thats on pin X7
+        bra     VE2_STEP_1
 
-;*VE2_LOOKUP_PW1:
-;*        lda     config13_f2
-;*        bit     #c13_cs
-;*        bne     VE2_AN			; if alpha-N
-;*        lda     kpa			; SD, so use kpa for load
-;*        bra     VE2_STEP_1
-;*VE2_AN:
-;*        lda     tps
+VE2_LOOKUP_PW1:
+        lda     config13_f2
+        bit     #c13_cs
+        bne     VE2_AN			; if alpha-N
+        lda     kpa			; SD, so use kpa for load
+        bra     VE2_STEP_1
+VE2_AN:
+        lda     tps
 
-;*VE2_STEP_1:
-;*        sta     kpa_n
-;*        ldhx    #KPARANGEVE_f2
-;*        sthx    tmp1
-;*        lda     #$0b
-;*        sta     tmp3
-;*        lda     kpa_n
-;*        sta     tmp4
-;*        jsr     tableLookup
-;*        lda     tmp1
-;*        lda     tmp2
-;*        mov     tmp5,tmp8		; Index
-;*        mov     tmp1,tmp9		; X1
-;*        mov     tmp2,tmp10		; X2
+VE2_STEP_1:
+        sta     kpa_n
+        ldhx    #KPARANGEVE_f2
+        sthx    tmp1
+        lda     #$0b
+        sta     tmp3
+        lda     kpa_n
+        sta     tmp4
+        jsr     tableLookup
+        lda     tmp1
+        lda     tmp2
+        mov     tmp5,tmp8		; Index
+        mov     tmp1,tmp9		; X1
+        mov     tmp2,tmp10		; X2
 
-;*VE2_STEP_2:
-;*        ldhx    #RPMRANGEVE_f2
-;*        sthx    tmp1
-;*        mov     #$0b,tmp3		; 12x12
-;*        mov     rpm,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp11		; Index
-;*        mov     tmp1,tmp13		; X1
-;*        mov     tmp2,tmp14		; X2
+VE2_STEP_2:
+        ldhx    #RPMRANGEVE_f2
+        sthx    tmp1
+        mov     #$0b,tmp3		; 12x12
+        mov     rpm,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp11		; Index
+        mov     tmp1,tmp13		; X1
+        mov     tmp2,tmp14		; X2
 
-;*VE2_STEP_3:
+VE2_STEP_3:
 
-;*        clrh
-;*        ldx     #$0c			; 12x12
-;*        lda     tmp8
-;*        deca
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        VE2X
-;*        sta     tmp15
-;*        incx
-;*        VE2X
-;*        sta     tmp16
-;*        ldx     #$0c			; 12x12
-;*        lda     tmp8
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        VE2X
-;*        sta     tmp17
-;*        incx
-;*        VE2X
-;*        sta     tmp18
+        clrh
+        ldx     #$0c			; 12x12
+        lda     tmp8
+        deca
+        mul
+        add     tmp11
+        deca
+        tax
+        VE2X
+        sta     tmp15
+        incx
+        VE2X
+        sta     tmp16
+        ldx     #$0c			; 12x12
+        lda     tmp8
+        mul
+        add     tmp11
+        deca
+        tax
+        VE2X
+        sta     tmp17
+        incx
+        VE2X
+        sta     tmp18
 
-;*        jsr     VE_STEP_4
-;*        mov     tmp6,vecurr2
+        jsr     VE_STEP_4
+        mov     tmp6,vecurr2
 
  ;*********** Dual Table CALCULATIONS***********************************
-;* ; I think theres only need to do this bit as the rest would have been done in VE1?
+ ; I think theres only need to do this bit as the rest would have been done in VE1?
 
-;*        mov     warmcor,tmp10		; Warmup Correction in tmp10
-;*        clr     tmp11			; tmp11 is zero
-;*        mov     tpsfuelcorr,tmp12	; tpsfuelcut in tmp12
-;*        clr     tmp13			; tmp13 is zero
-;*        jsr     Supernorm		; do the multiply and normalization
-;*        mov     tmp10,tmp31		; save whole result in tmp31
-;*        mov     tmp11,tmp32		; save remainder in tmp32
+        mov     warmcor,tmp10		; Warmup Correction in tmp10
+        clr     tmp11			; tmp11 is zero
+        mov     tpsfuelcorr,tmp12	; tpsfuelcut in tmp12
+        clr     tmp13			; tmp13 is zero
+        jsr     Supernorm		; do the multiply and normalization
+        mov     tmp10,tmp31		; save whole result in tmp31
+        mov     tmp11,tmp32		; save remainder in tmp32
 
-;*        mov     barocor,tmp10		; tmp10 is barometer percent
-;*        clr     tmp11			; zero to tmp11
-;*        mov     AirCor,tmp12		; air temp correction % in tmp12
-;*        clr     tmp13			; tmp13 is zero
-;*        jsr     Supernorm		; multiply and divide by 100
+        mov     barocor,tmp10		; tmp10 is barometer percent
+        clr     tmp11			; zero to tmp11
+        mov     AirCor,tmp12		; air temp correction % in tmp12
+        clr     tmp13			; tmp13 is zero
+        jsr     Supernorm		; multiply and divide by 100
 
 					; result in tmp10:tmp11
 
-;*        mov     tmp31,tmp12		; move saved tmp31 into tmp12
-;*        mov     tmp32,tmp13		; move saved tmp32 into tmp13
-;*        jsr     Supernorm		; multiply/divide
-;*        mov     tmp10,tmp5		; save whole result into tmp5
-;*        mov     tmp11,tmp6		; save remainder into tmp6
+        mov     tmp31,tmp12		; move saved tmp31 into tmp12
+        mov     tmp32,tmp13		; move saved tmp32 into tmp13
+        jsr     Supernorm		; multiply/divide
+        mov     tmp10,tmp5		; save whole result into tmp5
+        mov     tmp11,tmp6		; save remainder into tmp6
 
-;*        lda     DTmode_f
-;*        bit     #alt_i2ge
-;*        bne     ld_ve_2			; Are we using gammae in Second PW?
-;*        mov     #100T,GammaE
-;*        bra     ld_ve2_Done
+        lda     DTmode_f
+        bit     #alt_i2ge
+        bne     ld_ve_2			; Are we using gammae in Second PW?
+        mov     #100T,GammaE
+        bra     ld_ve2_Done
 
-;*ld_ve_2:
-;*        mov     tmp10,GammaE
-;*ld_ve2_Done:
-;*        mov     EGOcorr2,tmp10		; closed-loop correction percent
+ld_ve_2:
+        mov     tmp10,GammaE
+ld_ve2_Done:
+        mov     EGOcorr2,tmp10		; closed-loop correction percent
 					; into tmp10
-;*        clr     tmp11			; remainder is zero
+        clr     tmp11			; remainder is zero
 
-;*        brset  hybridAlphaN,feature1,skip_loadccomp2	; if hybrid then
+        brset  hybridAlphaN,feature1,skip_loadccomp2	; if hybrid then
 							; skip AN bypass
 
-;*        lda    config13_f2
-;*        bit     #c13_cs
-;*        beq     skip_loadccomp2      ; Ignore if not alpha-N
+        lda    config13_f2
+        bit     #c13_cs
+        beq     skip_loadccomp2      ; Ignore if not alpha-N
 
-;*        lda     feature9_f             ; Using Alhpa-n so
-;*        bit     #BaroCorConstb         ; are we adding the KPa factor?
-;*        beq     LoadContribDn2
+        lda     feature9_f             ; Using Alhpa-n so
+        bit     #BaroCorConstb         ; are we adding the KPa factor?
+        beq     LoadContribDn2
 
-;*skip_loadccomp2:
+skip_loadccomp2:
 
-;*        mov     kpa,tmp12		; MAP into tmp12
-;*        clr     tmp13			; no remainder
-;*        jsr     Supernorm		; do the multiply and divide
+        mov     kpa,tmp12		; MAP into tmp12
+        clr     tmp13			; no remainder
+        jsr     Supernorm		; do the multiply and divide
 
 ; NORMAL KPA stuff now
-;*LoadContribDn2:
-;*        mov     tmp5,tmp12		; take saved result in tmp5 and put into tmp12
-;*        mov     tmp6,tmp13		; tmp6 into tmp13
-;*        jsr     Supernorm		; mult/div
-;*        mov     tmp10,tmp3		; result (whole) save in tmp3
-;*        mov     tmp11,tmp4		; remainder result save in tmp4
+LoadContribDn2:
+        mov     tmp5,tmp12		; take saved result in tmp5 and put into tmp12
+        mov     tmp6,tmp13		; tmp6 into tmp13
+        jsr     Supernorm		; mult/div
+        mov     tmp10,tmp3		; result (whole) save in tmp3
+        mov     tmp11,tmp4		; remainder result save in tmp4
 
-;*        mov     vecurr2,tmp10		; VE into tmp10
-;*        clr     tmp11			; no remainder value for VE
-;*        lda     page
-;*        cmp     #02T
-;*        beq     rqfr2
-;*        lda     REQ_FUEL_f2
-;*        bra     rqfe2
-;*rqfr2:
-;*        lda     REQ_FUEL_r
+        mov     vecurr2,tmp10		; VE into tmp10
+        clr     tmp11			; no remainder value for VE
+        lda     page
+        cmp     #02T
+        beq     rqfr2
+        lda     REQ_FUEL_f2
+        bra     rqfe2
+rqfr2:
+        lda     REQ_FUEL_r
 
-;*rqfe2:
+rqfe2:
 
-;*        sta     tmp12			; req-fuel into tmp12
-;*        clr     tmp13			; no remainder
-;*        jsr     Supernorm		; mult/div
+        sta     tmp12			; req-fuel into tmp12
+        clr     tmp13			; no remainder
+        jsr     Supernorm		; mult/div
 
-;*        mov     tmp3,tmp12		; take previous result and put in tmp12
-;*        mov     tmp4,tmp13		; again for remainder
-;*        jsr     Supernorm		; multiply/divide
+        mov     tmp3,tmp12		; take previous result and put in tmp12
+        mov     tmp4,tmp13		; again for remainder
+        jsr     Supernorm		; multiply/divide
 
-;*        mov     tmp10,tmp11
+        mov     tmp10,tmp11
 
-;*End_DTCalcs:
+End_DTCalcs:
 
-;*    ;     jsr     BATT_CORR_CALC		; result in tmp6
+    ;     jsr     BATT_CORR_CALC		; result in tmp6
 
-;*          bra     BATT_CORR_CALC2
+          bra     BATT_CORR_CALC2
 
 
 ***************************************************************************
@@ -3070,50 +3099,50 @@ PW_Done:
 **
 ***************************************************************************
 
-;*BATT_CORR_CALC2:
-;*        clrh
-;*        mov     #061T,liX1		; x1
-;*        mov     #164T,liX2		; x2
-;*        lda     injopen_f2
-;*        add     battfac_f2
-;*        sta     liY1			; y1
-;*        lda     injopen_f2
-;*        sub     battfac_f2
-;*        sta     liY2			; y2
-;*        bpl     MBFF2			; y2 < 0, underflow
-;*        clr     liY2			; Screws up slope, but gives
+BATT_CORR_CALC2:
+        clrh
+        mov     #061T,liX1		; x1
+        mov     #164T,liX2		; x2
+        lda     injopen_f2
+        add     battfac_f2
+        sta     liY1			; y1
+        lda     injopen_f2
+        sub     battfac_f2
+        sta     liY2			; y2
+        bpl     MBFF2			; y2 < 0, underflow
+        clr     liY2			; Screws up slope, but gives
 					; reasonable result.
-;*MBFF2:
-;*        mov     batt,liX		; xInterp
-;*        jsr     LinInterp		; injector open time in tmp6
+MBFF2:
+        mov     batt,liX		; xInterp
+        jsr     LinInterp		; injector open time in tmp6
 
 ***************************************************************************
 * Check if 300kpa or 400kpa map sensor
 ***************************************************************************
 
-;*        lda     config11_f1
-;*        and     #$03
-;*        cmp     #$02			; Are we using Turbo Map sensor?
-;*        blo     CALC_FINAL2    ; skip if 0 or 1
+        lda     config11_f1
+        and     #$03
+        cmp     #$02			; Are we using Turbo Map sensor?
+        blo     CALC_FINAL2    ; skip if 0 or 1
 
 ; If we get here we are using non-standard map sensor
 ; so do kpa * compensation factor to work out larger kpa
 ; value then add it back to the normal kpa cals later
 
-;*        cbeqa   #2T,mul300_2
-;*        ldx     #KPASCALE400
-;*        bra     lcd_cont2
-;*mul300_2:
-;*        ldx     #KPASCALE300
-;*lcd_cont2:
-;*        lda     tmp11
-;*        mul
-;*        txa
-;*        add     tmp11
-;*        bcc     Store_Mod_KPa2
-;*        lda     #255T           ; Limit
-;*Store_Mod_KPa2:
-;*        sta     tmp11
+        cbeqa   #2T,mul300_2
+        ldx     #KPASCALE400
+        bra     lcd_cont2
+mul300_2:
+        ldx     #KPASCALE300
+lcd_cont2:
+        lda     tmp11
+        mul
+        txa
+        add     tmp11
+        bcc     Store_Mod_KPa2
+        lda     #255T           ; Limit
+Store_Mod_KPa2:
+        sta     tmp11
 
 ***************************************************************************
 **       F O R    V E   T A B L E   2
@@ -3128,38 +3157,38 @@ PW_Done:
 **  of battery voltage.
 **
 ***************************************************************************
-;*CALC_FINAL2:
+CALC_FINAL2:
 
-;*        lda     tmp11			; From required fuel, above.
-;*        beq     PW2_Done			; If no calculated pulse, then
+        lda     tmp11			; From required fuel, above.
+        beq     PW2_Done			; If no calculated pulse, then
 					; don't open at all.
-;*        add     tmp6			; from batt correction
-;*        bcs     MaxPulse2
-;*        add     TPSACCEL
-;*        bcs     MaxPulse2
-;*        bra     PW2_Done
+        add     tmp6			; from batt correction
+        bcs     MaxPulse2
+        add     TPSACCEL
+        bcs     MaxPulse2
+        bra     PW2_Done
 
-;*MaxPulse2:
-;*        lda     #$FF
-;*PW2_Done:
-;*        sta     tmp21           ; PW2 temp
+MaxPulse2:
+        lda     #$FF
+PW2_Done:
+        sta     tmp21           ; PW2 temp
 
-;*Calc_Final2Done:
+Calc_Final2Done:
 ****************************************************************************
 
-;*        mov     tmp22,tmp1		; When DT done put PW1 back into tmp1
+        mov     tmp22,tmp1		; When DT done put PW1 back into tmp1
 
-;*PW2_calc:
-;*        clr     tmp2
-;*        lda     DTmode_f
-;*        bit     #alt_i2t2		; if inj2 is not driven from
+PW2_calc:
+        clr     tmp2
+        lda     DTmode_f
+        bit     #alt_i2t2		; if inj2 is not driven from
 					; table1 then skip
-;*        bne     pw2_table2
-;*        mov     tmp20,tmp2		; 'PW' from table 1
-;*        bra     checkRPMsettings
-;*pw2_table2:
-;*        mov     tmp21,tmp2		; 'PW' from table 2
-;*        bra     checkRPMsettings
+        bne     pw2_table2
+        mov     tmp20,tmp2		; 'PW' from table 1
+        bra     checkRPMsettings
+pw2_table2:
+        mov     tmp21,tmp2		; 'PW' from table 2
+        bra     checkRPMsettings
 
 both_table1:
         lda     tmp20
@@ -3169,16 +3198,16 @@ both_table1:
 checkRPMsettings:
         ; Do all the rpm related stuff here.
 
-;*        brclr  ShiftLight,feature2,ShiftLightDone
+;*        brclr  ShiftLight,feature2,ShiftLightDone     ;* Shiftlight = 0
 ;*        lda    feature8_f   ; if spark output E then no shift lights
 ;*        bit    #spkeopb
 ;*        bne    ShiftLightDone
-;*        ; if rpm < shiftLo  bclr p3_3, bclr p3_4
-;*        ; shiftMd = (shiftLo+shiftHi)/2
-;*        ; if rpm < shiftMd  bset p3_3, bclr p3_4
-;*        ; if rpm < shiftHi  bclr p3_3, bset p3_4
-;*        ; otherwise         bset p3_3, bset p3_4
-;*;if wheel decoder second input is enabled then lower limit only functions
+        ; if rpm < shiftLo  bclr p3_3, bclr p3_4
+        ; shiftMd = (shiftLo+shiftHi)/2
+        ; if rpm < shiftMd  bset p3_3, bclr p3_4
+        ; if rpm < shiftHi  bclr p3_3, bset p3_4
+        ; otherwise         bset p3_3, bset p3_4
+;if wheel decoder second input is enabled then lower limit only functions
 
 ;*        lda    shiftLo_f
 ;*        cmp    rpm
@@ -3209,10 +3238,10 @@ checkRPMsettings:
 ;*        bset   4,portc
 ;*shiftLightDone:
 
-;*;Hard Cut Rev and Launch checks
-;*        bclr    sparkCut,RevLimBits		; Reset spark cut bit
-;*        brclr   LaunchControl,feature2,LaunchDone; Is Launch selected?
-;*;Changes to launch system for 025y - JSM
+;Hard Cut Rev and Launch checks
+        bclr    sparkCut,RevLimBits		; Reset spark cut bit
+;*        brclr   LaunchControl,feature2,LaunchDone; Is Launch selected?    ;* LaunchControl = 0
+;Changes to launch system for 025y - JSM
 ;*        brset   Launch,portd,Reset_VL		; Button not pressed so
 						; reset variable bit
 ;*        lda     VlaunchLimit
@@ -3247,7 +3276,7 @@ checkRPMsettings:
 ;*        bra     str_launch
 
 ;*Reset_VL:
-;*       clra
+;*        clra
 ;*        bclr    lc_fs,SparkBits                 ; make sure flatshift mode off
 
 ;*str_launch:
@@ -3257,7 +3286,7 @@ checkRPMsettings:
 ;*chk_Launch_lim:
 ;*        lda     tps				; Is throttle in right place?
 ;*        cmp     LC_Throttle_f
- ;*       blo     LaunchDone			; No then no LC
+;*        blo     LaunchDone			; No then no LC
 
 ;*        lda     Vlaunchlimit			; load up limit
 ;*        cmp     rpm
@@ -3265,7 +3294,7 @@ checkRPMsettings:
 ;*LaunchDone:
 
 ; ***Over Boost Protection**********************************
-;*            lda    Over_B_P_f			; load in Over boost KPa value
+;*            lda    Over_B_P_f			; load in Over boost KPa value   ;* Over_B_P_f = 0
 ;*            cmp    #101T
 ;*            blo    BoostP_Done			; If set to less than 100KPa
 						; then no boost protection
@@ -3291,14 +3320,14 @@ checkRPMsettings:
 ;*BoostP_Done:
 
 ;implement fuel cut from rev limiter soft limiter
-;*        brset   RevLimHSoft,RevLimBits,Chk_Rev_Cuts
+;*        brset   RevLimHSoft,RevLimBits,Chk_Rev_Cuts       ;* RevLimSoft = 0
 
         ; Hard-cut rev limiter, done here during pulse
         ; calcs to avoid timing issues if we set pw and
         ; then reset it a few instructions later.  I was
         ; seeing "ghost" pulses when this was the case.
-;*checkHighLimit:
-;*        lda     revLimit_f
+checkHighLimit:
+;*        lda     revLimit_f                                ;* revLimit_f = 250T
 ;*        beq     checkRevsOk			; Zero means no limit
 ;*        cmp     rpm
 ;*        bhs     checkRevsOk			; We have not hit any
@@ -3325,8 +3354,8 @@ checkRPMsettings:
 ;*         bne     cutChannels
 ;*         bra     checkRevsOk
 
-;*;If we get here we are in Launch control
-;*;so check whether spark and or fuel cuts
+;If we get here we are in Launch control
+;so check whether spark and or fuel cuts
 ;*Chk_Cuts:
 ;*         lda     feature5_f
 ;*         bit     #Fuel_SparkHLCb
@@ -3356,7 +3385,7 @@ checkRPMsettings:
 ;*        jmp     spark_lookup					; In fuel cut mode so return
 						; with zeros
 ;*checkRevsOk:
-;*        brclr   Traction,EnhancedBits2,No_Traction_On
+;*        brclr   Traction,EnhancedBits2,No_Traction_On      ;* Traction = 0
 ;*        lda     TCSparkCut
 ;*        beq     No_Traction_On			; If zero then no spark cut
 ;*        cmp     SparkCutCnt			; In traction mode do we
@@ -3365,33 +3394,34 @@ checkRPMsettings:
 ;*        bset    sparkCut,RevLimBits		; Set sparkcut bit
 
 ;*No_Traction_On:
- ;*       brset   OverRun,EnhancedBits,cutChannels; If Over run fuel cut on
+;*        brset   OverRun,EnhancedBits,cutChannels; If Over run fuel cut on ;* OverRun = 0
 						; cut fuel
 
 ;*; Add in the NOS and Staged PW's here
 ;*         lda     feature5_f
-;*         bit     #stagedeither
- ;*        bne     Add_to_PWCALC
+;*         bit     #stagedeither                       ;* stagedeither = 0
+;*         bne     Add_to_PWCALC
 ;*;        brset     staged,feature5,Add_to_PWCALC ; If in Staged mode Add
 						; to PW1+2
 ;*;        brset     stagedMode,feature5,Add_to_PWCALC; If in Staged mode
 						; Add to PW1+2
-;*        brset     Nitrous,feature1,Add_to_PWCALC; If NOS System selected
+;*        brset     Nitrous,feature1,Add_to_PWCALC; If NOS System selected ;* Nitrous = 0
 						; add to PW1+2
 
-;*        brset     crank,engine,No_TCAccel
+        brset     crank,engine,No_TCAccel
 
-;*        lda       tmp1
-;*        add       TCAccel
-;*        sta       tmp1
-;*        lda       tmp2
-;*        add       TCAccel			; Add in the traction
+        lda       tmp1
+        add       TCAccel
+        sta       tmp1
+        lda       tmp2
+        add       TCAccel			; Add in the traction
 						; control enrichments
-;*        sta       tmp2
-;*No_TCAccel:
-;*        mov       tmp1,pwcalc1
-;*        mov       tmp2,pwcalc2
-;*        jmp       spark_lookup
+        sta       tmp2
+No_TCAccel:
+        mov       tmp1,pwcalc1
+        mov       tmp2,pwcalc2
+        jmp       spark_lookup
+
 ;*Add_to_PWCALC:
 ;*        lda       DTmode_f			; check if DT in use
 ;*        bit       #alt_i2t2
@@ -3426,7 +3456,7 @@ checkRPMsettings:
 						; running so PW2 = 0
 ;*Staging_Done_PW:
 ;*        lda       DTmode_f			; check if DT in use
-;*       bit       #alt_i2t2
+;*        bit       #alt_i2t2
 ;*        beq       Nos_PWCal2			; i2t2=1
 ;*        lda       feature4_f
 ;*        bit       #DtNosb
@@ -3456,7 +3486,7 @@ checkRPMsettings:
 **
 ***************************************************************************
 spark_lookup:
-;*                lda     personality_f   ; Are we using a spark mode?
+;*                lda     personality_f   ; Are we using a spark mode?  ;* personality_f = 4T
 ;*                beq     No_Personality
 
                 lda     page
@@ -3467,7 +3497,7 @@ spark_lookup:
 ;*No_Personality:
 ;*                jmp     CheckSoftLimit  ; No spark Stuff set, so only fuel
 
-fixed_fl:       lda     FixedAngle_f
+fixed_fl:       lda     FixedAngle_f              ;* 0T for use map, 56T for 10 degrees
 fxr_c:
                 cmp     #$03
                 blo     NOT_FIXED	; Added this as earlier MT didnt
@@ -3475,7 +3505,7 @@ fxr_c:
                ;; sta     SparkAngle	; else use this fixed advance
                 jmp     CALC_DELAY
 NOT_FIXED:
-;*                brclr   LaunchOn,RevLimBits,Not_LC_in
+;*                brclr   LaunchOn,RevLimBits,Not_LC_in      ;* LaunchOn = 0
 ;*                brset   lc_fs,SparkBits,nf_flat
 ;*                lda     LC_LimAngle_f	; Launch Retard spark Angle
 ;*              ;;  sta     SparkAngle
@@ -3485,7 +3515,7 @@ NOT_FIXED:
 ;*              ;;  sta     SparkAngle
 ;*                jmp     CALC_DELAY
 ;*Not_LC_in:
-;*		lda	IdleAdvance_f
+;*		lda	IdleAdvance_f                               ;* IdleAdvance = 0
 ;*		cmp	#$03
 ;*		blo	use_spark_table
 ;*                ; check if set too high. Users loading old MSQ will have $FF in this byte
@@ -3519,7 +3549,7 @@ NOT_FIXED:
 ;*		clra
 ;*		sta	idlAdvHld
 ;*use_spark_table:
-;*                brclr   RevLimSoft,RevLimBits,STTABLELOOKUP
+;*                brclr   RevLimSoft,RevLimBits,STTABLELOOKUP     ;* RevLimSoft = 0
 ;*                lda     SRevLimAngle	; Retard spark
 ;*                jmp     CALC_DELAY
 ***************************************************************************
@@ -3562,7 +3592,7 @@ STTABLELOOKUP:
 ; variable is MAP, not kpa
 
 ;*        lda     feature9_f
-;*        bit     #MassAirFlwb
+;*        bit     #MassAirFlwb                              ;* MassAirFlwb = 0
 ;*        beq     SD_ALPHa_N              ; Are we using a MAF on pin X7?
 
 ;*        lda     o2_fpadc                ; Using MAF thats on pin X7
@@ -3572,7 +3602,7 @@ STTABLELOOKUP:
 ;*SD_ALPHa_N:
 ;*        lda     config13_f1		; Check if in speed-density or
 					; Aplha-N mode
-;*        bit     #$04			; Use BIT instead of brset because
+;*        bit     #$04			; Use BIT instead of brset because   * bit2 = 0 (Speed Density)
 					; outside of zero-page
 ;*	beq     Kpa_n_Kpa		; Branch if the bit is clear
 
@@ -3666,7 +3696,7 @@ ST_STEP_6:
 ; Spark Table 2 Lookup
 ;*ST2_STEP_1:
 ;*        lda     feature5_f  ; Are we using SparkTable2?
-;*        bit     #SparkTable2b
+;*        bit     #SparkTable2b                        ;* SparkTable2b = 0
 ;*        beq     LookUp_Done
 					;
 ;*        brclr   Nitrous,feature1,No_NOS_STable2	; Are we using NOS?
@@ -3685,7 +3715,7 @@ ST_STEP_6:
 ;*        mov     tmp1,tmp9		;X1
 ;*        mov     tmp2,tmp10		;X2
 ;*        jmp     ST2_STEP_2
-;*
+
 ;*LookUp_Done:
 ;*        jmp     LookUp_Finished
 
@@ -3759,12 +3789,12 @@ ST_STEP_6:
         lda     tmp31			; Reload the look up angle for ST1
         sta     tmp6
 Not_ST1:
-         lda     page
+        lda     page
         cmp     #3
         bne     trim_fl
-        lda     TrimAngle_r
+        lda     TrimAngle_r                  ;* same as TrimAngle_f ??
         bra     trim_c
-trim_fl: lda     TrimAngle_f
+trim_fl: lda     TrimAngle_f                      ;* TrimAngle_f = 0
 trim_c: bpl     CHECK_SP_ADD		; check adding of trim
         add     tmp6			; add lookup angle
         bcs     TRIM_DONE		; if carry, all is done = high advance
@@ -3781,31 +3811,31 @@ CHECK_SP_ADD:
 
 TRIM_DONE:
         brclr   crank,engine,TRIM_DONE2
-;*        brset   nextcyl,EnhancedBits4,td_nc
-        lda     CrankAngle_f		; Update spark angle for User Interface
+;*        brset   nextcyl,EnhancedBits4,td_nc          ;* nextcyl = 0
+        lda     CrankAngle_f	; Update spark angle for User Interface   ;* CrankAngle_f = 10/.352=28 (10 degrees)
 ;*        bra     TRIM_DONE2
 ;*td_nc:
-;*        lda     TriggAngle_f            ; if next cyl cranking then use trigger angle
+;*        lda     TriggAngle_f  ; if next cyl cranking then use trigger angle  ;* TriggAngle_f = 227T (80 degrees)
 ;*        add     #28T                    ; add on 10 deg offset
 
 TRIM_DONE2:
-;*;       bmi     store_spark		; Check if result negative
+;       bmi     store_spark		; Check if result negative
 					; (i.e. > 10ATDC)
-;*;       lda     #0			; Clamp to minimum (surely safer?)
-;*store_spark:
+;       lda     #0			; Clamp to minimum (surely safer?)
+store_spark:
         brset   crank,engine,store_spark2	; if we are cranking skip
 					;to the save
 
-;*        add     CltIatAngle
-;*        add     KnockAngleRet
-;*        add     NitrousAngle
-;*        clc				; Clear carry bit **
-;*        add     TCAngle
-;*        bcc     Store_Spark_Ang		; Did we over flow with the
+        add     CltIatAngle                          ;* CltIatAngle = 0
+        add     KnockAngleRet                       ;* KnockAngleRet = 0
+        add     NitrousAngle                          ;* NitrousAngle = 0
+        clc				; Clear carry bit **
+        add     TCAngle                               ;* TCAngle= 0
+        bcc     Store_Spark_Ang		; Did we over flow with the
 					; traction angle? **
-;*        lda     #28T			; Yes so limit angle to 0 deg **
-;*Store_Spark_Ang:
-;*        brclr   LaunchOn,RevLimBits,store_spark2
+        lda     #28T			; Yes so limit angle to 0 deg **
+Store_Spark_Ang:
+;*        brclr   LaunchOn,RevLimBits,store_spark2          ;* LaunchOn = 0
 ;*        brset   lc_fs,SparkBits,nf_flat2
 ;*        lda     LC_LimAngle_f		; Launch Retard spark Angle
 ;*        bra     store_spark2
@@ -3816,9 +3846,9 @@ store_spark2:
 CALC_DELAY:
         tax    ; take a copy in x, but don't save to SparkAngle yet
 
-;*        brset   EDIS,personality,edis_calc
+;*        brset   EDIS,personality,edis_calc             ;* EDIS = 0
 
-;*        brclr   nextcyl,EnhancedBits4,this_cyl
+;*        brclr   nextcyl,EnhancedBits4,this_cyl        ;* nextcyl = 0
 ;*        sub     #28T                    ; subtract 10 deg offset
 ;*        bcs     next_cyl_rail           ; just in case map has -ves in it.
 ;*        cmp     TriggAngle_f
@@ -3828,10 +3858,10 @@ CALC_DELAY:
 ;*        add     #31T			; add on 10deg offset + 1 degree safety margin
 ;*        tax                             ; save copy in x
 ;*        sub     #28T                    ; remove that 10deg offset again
-*****************************************************************************
-**  next Cyl mode works like this...
-**  DelayAngle = SparkAngle-Trigger
-*****************************************************************************
+;******************************************************************************
+;***  next Cyl mode works like this...
+;***  DelayAngle = SparkAngle-Trigger
+;******************************************************************************
 ;*next_cyl_calc:
 ;*        stx     SparkAngle
 ;*        sub     TriggAngle_f
@@ -3845,26 +3875,26 @@ CALC_DELAY:
         sub     SparkAngle
         add     #28T
         sta     DelayAngle
-;*        bra     CheckSoftLimit
+        bra     CheckSoftLimit
 
 ;*edis_calc:
-*****************************************************************************
-** Delay angle not used, but code left as-is for simplicity
-** now convert to SAW width.  SAW = 1536 - (25.6 * adv)
-** SparkAngle = adv / 45 * 128   by definition in MSS
-** adv = SparkAngle * 45 / 128   re-arrange for adv
-**              (256 * 45 * SparkAngle)
-** SAW = 1536 - (---------------------)
-**              (128 * 10             )
-**
-** SAW (us) = 1536 - (SparkAngle * 9)
-** BUT we will use baseline timing of 10ATDC so formula becomes
-** SAW (us) = 1792 - (SparkAngle * 9)
-**
-** JSM - physical tests show some skewing, pulse is 2-3% longer and at
-** least 15us too long
-** make it 1777 ($6f1)
-*****************************************************************************
+;*****************************************************************************
+;** Delay angle not used, but code left as-is for simplicity
+;** now convert to SAW width.  SAW = 1536 - (25.6 * adv)
+;** SparkAngle = adv / 45 * 128   by definition in MSS
+;** adv = SparkAngle * 45 / 128   re-arrange for adv
+;**              (256 * 45 * SparkAngle)
+;** SAW = 1536 - (---------------------)
+;**              (128 * 10             )
+;**
+;** SAW (us) = 1536 - (SparkAngle * 9)
+;** BUT we will use baseline timing of 10ATDC so formula becomes
+;** SAW (us) = 1792 - (SparkAngle * 9)
+;**
+;** JSM - physical tests show some skewing, pulse is 2-3% longer and at
+;** least 15us too long
+;** make it 1777 ($6f1)
+;*****************************************************************************
 
 ;*        stx     SparkAngle
 ;*        txa
@@ -3898,17 +3928,17 @@ CALC_DELAY:
 ;*NOT_MULTI:
 ;*        ldhx    tmp1
 ;*        sthx    sawh			; save 16-bits in one instruction
-					; to avoid interruption
+;*					; to avoid interruption
 
 ***************************************************************************
 **
 ** Check rev limiters
 **
 ***************************************************************************
-;*CheckSoftLimit:
-;*                bclr    LaunchOn,RevLimBits	; Clear the Soft Launch
+CheckSoftLimit:
+                bclr    LaunchOn,RevLimBits	; Clear the Soft Launch
 						; Rev Limit bit
-;*                brclr   LaunchControl,feature2,Magnus_revlimiters; Is Launch
+;*                brclr   LaunchControl,feature2,Magnus_revlimiters; Is Launch  ;* LaunchControl = 0
 						; selected?
 ;*                brset   Launch,portd,Magnus_revlimiters	; Button not pressed
 						; so reset variable bit
@@ -3931,27 +3961,27 @@ CALC_DELAY:
 ;*                bra     SRevLimOnDone		; Jump past rpm limit checks
 
 ;*Magnus_revlimiters:
-;*                lda     SRevLimRPM
+;*                lda     SRevLimRPM                           ;* SRevLimRPM = 0
 ;*                beq     SRevLimOnDone		; skip if zero
 ;*                cmp     rpm
 ;*                blo     SRevLimOn		; rpm higher than limit
 ;*                bhi     SRevLimOff		; rpm lower than limit
 ;*                brset   RevLimSoft,RevLimBits,SRevLimOn ; at limit check
-						; current status
+;*						; current status
 ;*SRevLimOff:
 ;*                bclr    RevLimSoft,RevLimBits	; Clear soft limit bit
 ;*                bclr    RevLimHSoft,RevLimBits	; Clear soft limit fuel cut bit
 ;*                bra     SRevLimDone
 
 ;*SRevLimOn:
- ;*               bset    RevLimSoft,RevLimBits	; Set soft limit bit
+;*                bset    RevLimSoft,RevLimBits	; Set soft limit bit
 ;*;                lda     SRevLimCTime		; Set Cool down period
 ;*;                sta     SRevLimCoolLeft
 ;*                lda     SRevLimTimeLeft		; Check if time left =
-;*						; counting down
+						; counting down
 ;*                bne     SRevLimOnDone
 ;*                brset   RevLimHSoft,RevLimBits,SRevLimOnDone	; Check if
-;*						; soft limit has cut fuel
+						; soft limit has cut fuel
 ;*                lda     SRevLimHTime		; Set delay time for soft
 ;*						; limit to cut fuel
 ;*                sta     SRevLimTimeLeft
@@ -3963,11 +3993,11 @@ CALC_DELAY:
 ** Check outputs
 **
 ***************************************************************************
-;*CheckOutputs:
-;*                clrh
-;*                brset   BoostControl,feature2,Out1DoneJMP; If Boost control
-;*					; used then no output1
-;*                lda     Out1Source
+CheckOutputs:
+                clrh
+;*                brset   BoostControl,feature2,Out1DoneJMP; If Boost control  ;* BoostControl = 0
+					; used then no output1
+;*                lda     Out1Source                                          ;* Out1Source = 0
 ;*                cmp     #31T
 ;*                beq     TractOut1
 ;*                cmp     #05T		; Are we using temperature?
@@ -4009,13 +4039,13 @@ CALC_DELAY:
 ;*Out1DoneJMP:
 ;*                bra     Out1Done
 ;*Not_Temps1:
-;*                ldx     Out1Source	; Get source
+;*                ldx     Out1Source	; Get source     ;* Out1Source = 0
 ;*                beq     Out1Done	; No source = no check
 ;*                lda     secl,x		; Get data
 ;*                sta     tmp31
 ;*                cmp     Out1Lim		; Check limit
 ;*                bhi     Out1On		; Above limit, set output
- ;*               beq     Out1Done	; Equal to limit skip out
+;*                beq     Out1Done	; Equal to limit skip out
 ;*; Hysterisis check
 ;*Hyster1:
 ;*                brclr   Output1On,Enhancedbits2,Out1Off	; Is output 1 off?
@@ -4048,7 +4078,7 @@ CALC_DELAY:
 ;*                beq     No_Upper_Lim1	; If zero no limit
 ;*                cmp     secl,x
 ;*                bhi     No_Upper_Lim1	; If higher than setpoint dont
-;*					; clear output
+					; clear output
 ;*                lda     feature4_f
 ;*                bit     #InvertOutOneb
 ;*                bne     out1_set
@@ -4066,7 +4096,7 @@ CALC_DELAY:
 
 ;*Out1Done:
 
-;*                lda     Out2Source
+;*                lda     Out2Source                           ;* Out2Source = 0
 
 ;*                cmp     #31T
 ;*                beq     TractOut2
@@ -4108,7 +4138,7 @@ CALC_DELAY:
 ;*                bra     Hyster2
 
 ;*Not_Temps2:
-;*                ldx     Out2Source	; Get source
+;*                ldx     Out2Source	; Get source         ;* Out2Source = 0
 ;*                beq     Out2Done	; No source = no check
 ;*                lda     secl,x		; Get data
 ;*                sta     tmp31
@@ -4163,23 +4193,23 @@ CALC_DELAY:
 ;*                bit     #InvertOutTwob
 ;*                bne     out2_clr
 ;*out2_set:
-;*                bset    Output2,porta	; Below limit, set output (Inverted)
+                bset    Output2,porta	; Below limit, set output (Inverted)
 ;*Out2Done:
 
-*******************************************************************************
-** OUTPUT 3 Port D 0 (pin 15 top of R14) with delay off timer
-*******************************************************************************
+;*******************************************************************************
+;** OUTPUT 3 Port D 0 (pin 15 top of R14) with delay off timer
+;*******************************************************************************
 
-;*                brset   out3sparkd,feature2,out3done
+;*                brset   out3sparkd,feature2,out3done         ;* out3sparkd = 0
 ;*                clrh
 ;*                lda     feature8_f
-;*                bit     #Out1_Out3b	; Are we in Out1+ mode?
+;*                bit     #Out1_Out3b	; Are we in Out1+ mode?   ;* Out1_Out3b = 0
 ;*                beq     Norm_Out3_check
 ;*                brclr   Output1,porta,Out3Off	; If Output1 is off then
 ;*					; don't do any checks for Out3
 
 ;*Norm_Out3_check:
-;*                lda     Out3Source_f
+;*                lda     Out3Source_f                            ;* Out3Source_f = %00000000
 ;*                bit     #$0f		; Only use 5 bits of this byte
 ;*                beq     Out3Done	; No source = no check
 ;*           ;     cmp     #01T
@@ -4254,17 +4284,17 @@ CALC_DELAY:
 ;*Out3Done:
 
 
-*****************************************************************************
-**   OUTPUT 4
-*******************************************************************************
+;******************************************************************************
+;***   OUTPUT 4
+;********************************************************************************
 ;*; OUTPUT 4 LED 18 can be used as a standard output or as a fan control
 ;*; for those using WATER INJECTION on X2
-
-;*                brset   REUSE_LED18,outputpins,Out4Done	; being used as IRQ
+;*
+;*                brset   REUSE_LED18,outputpins,Out4Done	; being used as IRQ   ;* REUSE_LED18 = 0
 ;*					; or COIL C
-;*                brclr   REUSE_LED18_2,outputpins,Out4Done	; Are we re
+;*                brclr   REUSE_LED18_2,outputpins,Out4Done	; Are we re          ;* REUSE_LED18_2 = 0
 ;*					; using LED18 as output4?
-;*                brset   LED18_FAN,outputpins,Out4Done	; Are we using it
+;*                brset   LED18_FAN,outputpins,Out4Done	; Are we using it        ;* LED18_FAN = 0
 ;*					;as fan control?
 ;*                clrh
 ;*                lda     Out4Source_f
@@ -4325,17 +4355,17 @@ CALC_DELAY:
 
 ;*Out4Done:
 
-***************************************************************************
-**
-** Fan Control - added separate off-temp - from RPE
-** Can use X2 and or LED18
-**
-***************************************************************************
-;*        brset   X2_FAN,outputpins,DO_FAN_Check	; Are we using X2 as fan
-;*						; control?
-;*        brset   REUSE_LED18,outputpins,fan_exit
-;*        brclr   REUSE_LED18_2,outputpins,fan_exit
-;*        brset   LED18_FAN,outputpins,DO_FAN_Check	; Are we using LED18
+;****************************************************************************
+;***
+;*** Fan Control - added separate off-temp - from RPE
+;*** Can use X2 and or LED18
+;***
+;****************************************************************************
+;*        brset   X2_FAN,outputpins,DO_FAN_Check	; Are we using X2 as fan  ;* X2_FAN = 1
+						; control?
+;*        brset   REUSE_LED18,outputpins,fan_exit                             ;* REUSE_LED18 = 0
+;*        brclr   REUSE_LED18_2,outputpins,fan_exit                           ;* REUSE_LED18_2 = 0
+;*        brset   LED18_FAN,outputpins,DO_FAN_Check	; Are we using LED18      ;* LED18_Fan = 0
 					; as fan control?
 ;*fan_exit:
 ;*        bra     FAN_DONE		; Nope, so return
@@ -4366,20 +4396,20 @@ CALC_DELAY:
 ;*FAN_DONE:
 
 
-*******************************************************************************
-**
-**   Over run fuel cut system                    (P Ringwood)
-**
-*******************************************************************************
+;********************************************************************************
+;***
+;***   Over run fuel cut system                    (P Ringwood)
+;***
+;********************************************************************************
 ;*Over_Run:
 ;*        lda     feature4_f
-;*        bit     #OverRunOnb
+;*        bit     #OverRunOnb                                     ;* OverRunOn = 0
 ;*        beq     Over_Run_Done
 
 ;*No_Over_Run:
 ;*        lda    kpa
 ;*        cmp    ORunKpa_f		; Is the KPa lower than the set point?
-;*       bhi    No_OverRun		; No so no over run
+;*        bhi    No_OverRun		; No so no over run
 ;*        lda    rpm
 ;*        cmp    ORunRpm_f		; Is the rpm higher than the setpoint?
 ;*        blo    No_OverRun		; No so no Over run
@@ -4411,17 +4441,17 @@ CALC_DELAY:
 
 ;*Over_Run_Done:
 
-*****************************************************************************
-**  Water Injection section
-**
-**  Turn 1st water output (X2) on if MAP and RPM and IAT higher than
-**  Water set point
-**
-**  Pulse water2 output (X3) at same rate as Fuel Injector #2.
-**
-***************************************************************************
+;******************************************************************************
+;***  Water Injection section
+;***
+;***  Turn 1st water output (X2) on if MAP and RPM and IAT higher than
+;***  Water set point
+;***
+;***  Pulse water2 output (X3) at same rate as Fuel Injector #2.
+;***
+;****************************************************************************
 ;*        lda     feature3_f
-;*        bit     #WaterInjb
+;*        bit     #WaterInjb                                     ;* WaterInjb = 0
 ;*        beq     Water_Inj_Done
 
 ;*Water_Injection:			; we only get here if water
@@ -4456,21 +4486,21 @@ CALC_DELAY:
 ;*           bclr   water,porta		;Turn off water pump
 ;*Water_Inj_Done:
 
-*****************************************************************************
-**
-**  Coolant Related Ignition Advance (P Ringwood)
-**  Add Advance of 1 deg per user defined amount of coolant temp below setpoint
-**
-*****************************************************************************
-***************************************************************************
-** DeadBand: If we are within 5 degrees above of coolant setpoint then
-** ensure we turn advance  setting to zero. This is incase temp jumps up
-** for some reason and leaves advance set.
-**
-** I have no idea if this could happen but I put it in just incase.
-*****************************************************************************
+;*****************************************************************************
+;**
+;**  Coolant Related Ignition Advance (P Ringwood)
+;**  Add Advance of 1 deg per user defined amount of coolant temp below setpoint
+;**
+;*****************************************************************************
+;***************************************************************************
+;** DeadBand: If we are within 5 degrees above of coolant setpoint then
+;** ensure we turn advance  setting to zero. This is incase temp jumps up
+;** for some reason and leaves advance set.
+;**
+;** I have no idea if this could happen but I put it in just incase.
+;*****************************************************************************
 ;*         lda    feature3_f
-;*         bit    #CltIatIgnitionb
+;*         bit    #CltIatIgnitionb                        ;* CltIatIgnitionb = 0
 ;*         beq    retard_endJmp
 
 ;*IatClt_Related:
@@ -4492,7 +4522,7 @@ CALC_DELAY:
 ;*					; till out of deadband
 
 ;** End of dead band
-**********************************************************************
+;***********************************************************************
 
 ;*carryOn_Advance:
 
@@ -4545,12 +4575,12 @@ CALC_DELAY:
 
 ;*Advance_end:
 
-*****************************************************************************
-**
-**  Add Retard of 1 deg per user defined amount of IAT when IAT and
-**  boost above setpoints
-**
-*****************************************************************************
+;*****************************************************************************
+;**
+;**  Add Retard of 1 deg per user defined amount of IAT when IAT and
+;**  boost above setpoints
+;**
+;*****************************************************************************
 
 ;*      lda   iatDeg_f			; load the temp per 1 deg of retard.
 ;*      beq   noRetard			; If zero then no Retard
@@ -4642,10 +4672,10 @@ CALC_DELAY:
 ***************************************************************************
 ;*        brset   REUSE_FIDLE,outputpins,idle_DoneJMP1
 
-;*IdleAdjust:
-;*;         brset   PWMidle,feature2,idlePWM
+IdleAdjust:
+;         brset   PWMidle,feature2,idlePWM
 ;*         lda     feature13_f
-;*         bit     #pwmidleb
+;*         bit     #pwmidleb                                    ;* pwmidleb = 1
 ;*         bne     idlePWM
 
 ;*;-- Toggle Mode ----------------------------------------------------------------
@@ -4667,23 +4697,23 @@ CALC_DELAY:
 
 ;-- PWM Mode -------------------------------------------------------------------
 
-;*idlePWM:
+idlePWM:
 	brset   istartbit,EnhancedBits6,Crank_PWM	; loop to stabilize on startup
 	brset   crank,engine,Crank_PWM		; open AIC for cranking
 	brclr   running,engine,Idle_doneJMP1	; no PWM adjust when not running
-;*;        brset   crank,engine,jeskipAdjust	; Don't adjust idle during cranking
+;        brset   crank,engine,jeskipAdjust	; Don't adjust idle during cranking
 ;*        lda     feature13_f
-;*        bit     #idle_warmupb
+;*        bit     #idle_warmupb                              ;* idle_warmupb = 1
 ;*        beq     idle_closedloop
 ;*;	bra	idle_closedloop  ;?? this prevents open loop from working
 
-;*; Warmup PWM
-;*idle_openloop:
+; Warmup PWM
+idle_openloop:
         lda     coolant
         cmp     slowIdleTemp_f
         blo     idle_loopcold
 ;*        lda     feature13_f                 ; If we are not using closed loop then clear DC
-;*        bit     #idle_clb
+;*        bit     #idle_clb                                     ;* idle_clb = 0
 ;*        beq     clrNskip
 ;*        bra     idle_closedloop
 
@@ -4748,8 +4778,9 @@ Idle_doneJMP2:
 idle_closedloop:
 ;*;	brclr	idle_cl,feature7,Idle_doneJMP1
 ;*        lda     feature13_f
-;*        bit     #idle_clb
+;*        bit     #idle_clb                                     ;* idle_clb = 0
 ;*        beq     idle_DoneJMP1
+    bra   idle_DoneJMP1
 ;*	lda     tps
 ;*	cmp     IdleThresh_f		; compare tps with treshold
 ;*	bhi	close_AIC		; tps based closure
@@ -4902,42 +4933,42 @@ idle_closedloop:
 
 Idle_done:
 
-******************************************************************************
-**          K n o c k  D e t e c t i o n  S y s t e m         P Ringwood    **
-**
-**    This receives an input in from the JP1 header, if its low it sees
-**    it as a knock.
-**    Basic functionality:
-**    Are we below the max rpm allowed?
-**      Yes- carry on with detection,
-**      No- reset all and end knock detection.
-**    Knock on input, retard ignition by the 1st retard value
-**    (KnockRetard1), start timer
-**    wait for timer to time out (KnockTimLft)
-**    Is it still knocking?
-**      Yes- then add knockretard2 value to total retard.
-**      No- then advance by KnockAdv amount.
-**    Is the total retard less than 1 degree?
-**      Yes- reset all knock settings, goto start.
-**      No- so carry on with timer
-**    Check for knock. If knocking add retard2 restart timer - if not
-**    Wait for timer to time out before adding advance.
-**    Is it still knocking?
-**      Yes- then add knockretard2 value to total retard, restart timer.
-**      No- then advance by KnockAdv amount, restart timer.
-**    Is the total retard less than 1 degree?
-**      Yes- reset all knock settings, goto start.
-**      No- so carry on with timer
-**    When timer timed out check for knock? If knocking add knockRetard2,
-**    if not advance
-**    etc, etc,
-**
-****************************************************************************
-****************************************************************************
-;*Knock_Detection:
+;******************************************************************************
+;**          K n o c k  D e t e c t i o n  S y s t e m         P Ringwood    **
+;**
+;**    This receives an input in from the JP1 header, if its low it sees
+;**    it as a knock.
+;**    Basic functionality:
+;**    Are we below the max rpm allowed?
+;**      Yes- carry on with detection,
+;**      No- reset all and end knock detection.
+;**    Knock on input, retard ignition by the 1st retard value
+;**    (KnockRetard1), start timer
+;**    wait for timer to time out (KnockTimLft)
+;**    Is it still knocking?
+;**      Yes- then add knockretard2 value to total retard.
+;**      No- then advance by KnockAdv amount.
+;**    Is the total retard less than 1 degree?
+;**      Yes- reset all knock settings, goto start.
+;**      No- so carry on with timer
+;**    Check for knock. If knocking add retard2 restart timer - if not
+;**    Wait for timer to time out before adding advance.
+;**    Is it still knocking?
+;**      Yes- then add knockretard2 value to total retard, restart timer.
+;**      No- then advance by KnockAdv amount, restart timer.
+;**    Is the total retard less than 1 degree?
+;**      Yes- reset all knock settings, goto start.
+;**      No- so carry on with timer
+;**    When timer timed out check for knock? If knocking add knockRetard2,
+;**    if not advance
+;**    etc, etc,
+;**
+;****************************************************************************
+;****************************************************************************
+;Knock_Detection:
 
 ;*        lda     feature3_f
-;*        bit     #KnockDetb
+;*        bit     #KnockDetb                                ;* KnockDetb = 0
 ;*        beq     End_KnockJmp   ; knock not enabled
 
 ;*        lda     feature8_f
@@ -4947,22 +4978,22 @@ Idle_done:
 ;*        clrh
 ;*        lda    rpm
 ;*        cmp    KnockRpmL_f		; Is the engine rpm too high for
-					; the knock sensor?
+;*					; the knock sensor?
 ;*        bhi    Clr_KnockJmp		; If it is clear values, no more retard
 ;*        cmp    KnockRpmLL_f		; Is it running lower than the
-					; low rpm setpoint?
+;*					; low rpm setpoint?
 ;*        blo    Clr_KnockJmp		; If so clear all values, no
-					; more retard
+;*					; more retard
 ;*        lda    kpa
 ;*        cmp    KnockKpaL_f		; Is the boost above the limit
-					; for knock system?
+;*					; for knock system?
 ;*        bhi    Clr_KnockJmp		; If it is clear knock values,
-					; no more retard.
+;*					; no more retard.
 ;*        brset  Knocked,SparkBits,KnockTLeft	; If knock has been
-					; previously detected do timer
+;*					; previously detected do timer
 ;*        brset  Advancing,RevLimBits,KnockALeft	; If we are advancing back
 ;*        brset  KnockIn,portd,End_KnockJmp	; If no knock on input
-					; then no knock
+;*					; then no knock
 ;*        bset   Knocked,SparkBits	; 1st Knock on input so set knocked bit
 ;*        lda    KnockRet1_f
 ;*        sta    KnockAngle		; Load in first retard amount
@@ -4975,17 +5006,17 @@ Idle_done:
 ;*        lda    KnockTimLft
 ;*        cmp    #00T
 ;*        beq    NoTimeLeft		; If timer counted down then add
-					; some advance
+;*					; some advance
 ;*        jmp    End_KnockJmp		; End of Knock
 
 ;*KnockALeft:
 ;*        bclr   Knocked,SparkBits	; Clear Retard set bit as we
-					; are advancing
+;*					; are advancing
 ;*        brclr  KnockIn,portd,Knocking_Still	; Do we have any knocking?
 ;*        lda    KnockTimLft
 ;*        cmp    #00T
 ;*        beq    NoTimeLeft		; If timer counted down then add
-					; some advance
+;*					; some advance
 ;*        jmp    End_KnockJmp		; End of Knock
 
 ;*NoTimeLeft:
@@ -4994,16 +5025,16 @@ Idle_done:
 ;*         bset  Advancing,SparkBits	; Set advancing bit
 ;*         lda   Boostknock_f
 ;*         beq   No_BoostKnock		; if no Boost Knock value then
-					; jump past checks
+;*					; jump past checks
 ;*         lda   KnockBoost		; Value to add to Boost controller
 ;*         sub   BoostKnock_f		; target
 ;*         sta   KnockBoost
 ;*         cmp   #03T
 ;*         blo   ClearTime		; If target boost less than
-					; 0.5psi then clear all
+;*					; 0.5psi then clear all
 ;*No_BoostKnock:
 ;*         lda   KnockAngle		; No Knock detected and time
-					; period over
+;*					; period over
 ;*         sub   KnockAdv_f		; so remove some retard
 
 ;*StoreKnock:
@@ -5068,31 +5099,30 @@ Idle_done:
 ;*         bclr   Advancing,RevLimBits	; Clear advancing bit
 ;*         lda    #$00			; Clear the knock angle value
 ;*         sta    KnockBoost		; Clear the boost value to remove
- ;*        sta    KnockAngle
+;*         sta    KnockAngle
 
 ;*StoreAngle:
 ;*         sta    KnockAngleRet		; Actual retard value for MSnS
 
 ;*End_Knock:
-******************************************************************************
-******************************************************************************
-**  Anti-Rev System                     P Ringwood
-**  System based on rate of change of rpm or input signals from
-**  2 x Vehicle Speed Sensors
-**  Fuel enrichment, to bog down the engine and retard angle are
-**  interpolated from the 4 bins of each setting. Spark Cut isn't
-**  interpolated as it's not worth the effort as it's such a low
-**  figure (1 or 2 cuts)
-**  Now added cycle counter so it can hold settings for an interpolated amount
-**  of engine cycles. Uses ASEcount, so can only work after start warm up over.
-**  Using this saves making h file bigger and adding yet another counter
-**  to the interupt.
-**
-********************************************************************************
-********************************************************************************
+;******************************************************************************
+;******************************************************************************
+;**  Anti-Rev System                     P Ringwood;**  System based on rate of change of rpm or input signals from
+;**  2 x Vehicle Speed Sensors
+;**  Fuel enrichment, to bog down the engine and retard angle are
+;**  interpolated from the 4 bins of each setting. Spark Cut isn't
+;**  interpolated as it's not worth the effort as it's such a low
+;**  figure (1 or 2 cuts)
+;**  Now added cycle counter so it can hold settings for an interpolated amount
+;**  of engine cycles. Uses ASEcount, so can only work after start warm up over.
+;**  Using this saves making h file bigger and adding yet another counter
+;;**  to the interupt.
+;**
+;********************************************************************************
+;********************************************************************************
 
 ;*        lda   feature6_f
-;*        bit   #TractionCb
+;*        bit   #TractionCb                                      ;* TractionCb = 0
 ;*        beq   Traction_DoneJMP
 
 ;*TractionSystem:
@@ -5163,7 +5193,7 @@ Idle_done:
 					; allowed at current speed
 ;*        sta    tmp31
 
-; Find out if we are slipping over the amount allowed
+;*; Find out if we are slipping over the amount allowed
 ;*        ldx     tmp32			; Load x reg with speed undriven
 					; wheels should be (calculated
 					; from driven wheel)
@@ -5175,15 +5205,15 @@ Idle_done:
 ;*        inca
 ;*Carry_Slip:
 ;*        add     o2_fpadc		; Acc = speed of undriven wheel
-					; + slip allowed
+;*					; + slip allowed
 ;*        bcs     NO_TC_Loss		; If we go over 255 then no traction
 ;*        cmp     tmp32			; Compare to calculated speed of
-					; undriven wheel
+;*					; undriven wheel
 ;*        bhi     NO_TC_Loss		; Were not over limit so no TC
 ;*        sta     tmp31			; Store speed of undriven wheel
-					; + slip allowed
+;*					; + slip allowed
 ;*        lda     tmp32			; Load calculated value of
-					; undriven wheel
+;*					; undriven wheel
 ;*        sub     tmp31
 ;*        sta     tmp32			; Store amount of traction loss
 ;*        bra     VSSThresh_RJMP
@@ -5191,8 +5221,8 @@ Idle_done:
 ;*Traction_DoneJMP:
 ;*        jmp     Traction_Done
 
-; If were here weve had Anti-Rev working and rpm is stable so do we
-; reset it yet or later?
+;*; If were here weve had Anti-Rev working and rpm is stable so do we
+;*; reset it yet or later?
 ;*reset_TC_Yet:
 ;*        brclr   TCcycleSec,feature7,Reset_TC_Now	; Reset it now if
 					; stable rpm selected
@@ -5241,7 +5271,7 @@ Idle_done:
 ;*        jsr     tablelookup		; Go find the address
 ;*        clrh
 ;*        lda     tmp5			; Put Address value from lookup
-					; into x reg
+;*					; into x reg
 ;*        tax
 ;*        sta     tmp31			; Save tmp5 for next lin inter
 ;*        bra     TC_Interpoler
@@ -5286,7 +5316,7 @@ Idle_done:
 ;*        lda     tmp6
 ;*        sta     TCCycles
 
-; Spark Cut finder
+;*; Spark Cut finder
 ;*        ldx     tmp31
 ;*        lda     TractSpark_f,x
 ;*        sta     TCSparkCut		; No need to lin interpolate as
@@ -5296,13 +5326,13 @@ Idle_done:
 ;*TC_InterpJMP:
 ;*        bra   TC_Interpoler
 
-; For speed sensor Anti-Rev system, find table value. Tmp32 contains loss
+;*; For speed sensor Anti-Rev system, find table value. Tmp32 contains loss
 ;*VSSThresh_Reach:
 ;*        bset    Traction,EnhancedBits2	; Set the traction control bit
 ;*        lda     #00T
 ;*        sta     ASEcount		; Reset the cycle counter
 ;*        clr     tmp2
-; Find percentage of loss: Undriven wheel/100 * loss of traction (tmp32)
+;*; Find percentage of loss: Undriven wheel/100 * loss of traction (tmp32)
 ;*        lda     o2_fpadc
 ;*        clrh
 ;*        ldx     #100T
@@ -5311,7 +5341,7 @@ Idle_done:
 ;*        pshh
 ;*        pula
 ;*        cmp     #50T			; Is remainder higher than half
-;*					; divisor?
+					; divisor?
 ;*        blo     Round_Slip_Per
 ;*        incx
 ;*Round_Slip_Per:
@@ -5327,8 +5357,8 @@ Idle_done:
 ;*Slip_Percentage:
 ;*        sta     tmp32			; Store percentage slip
 
-; Find the percent slip from the table lookup, store it in tmp31 for
-; the rest of the interpolaters
+;*; Find the percent slip from the table lookup, store it in tmp31 for
+;*; the rest of the interpolaters
 ;*        ldhx    #sliprate		; Store address for finding slipage
 ;*        sthx    tmp1
 ;*        mov     #$03,tmp3		; Table size 4 (3+1)
@@ -5338,11 +5368,11 @@ Idle_done:
 ;*        jsr     tablelookup		; Go find the address
 ;*        clrh
 ;*        lda     tmp5			; Put Address value from lookup
-					; into x reg
+;*					; into x reg
 ;*        tax
 ;*        sta     tmp31			; Save tmp5 for next lin inter
 ;*        bra     TC_InterpJMP		; Now go and work out the
-					; enrichments, etc
+;*					; enrichments, etc
 
 ;*Traction_Done:
 
@@ -5351,48 +5381,48 @@ Idle_done:
 ***************************************************************************
 
 ;SubSectionLoop:
-;*        brset   Primed,EnhancedBits,Prime_Checked	; Have we primed?
+;*        brset   Primed,EnhancedBits,Prime_Checked	; Have we primed?    ;* Primed is set when prime pulse is sheduled before the main loop
 ;*        jmp     NotPrimed
 
-;*Prime_Checked:
-;*        brclr   BoostControl,feature2,no_boost
+Prime_Checked:
+;*        brclr   BoostControl,feature2,no_boost     ;* BoostControl = 0
 ;*        jsr     CalcBoostDC
 
 ;*no_boost:
-;*        brclr   Nitrous,feature1,no_nitrous
+;*        brclr   Nitrous,feature1,no_nitrous           ;* Nitrous = 0
 ;*        jsr     EnableN2O
 
 ;*no_nitrous:
 ;*        lda     feature6_f
-;*        bit     #VETable3b
+;*        bit     #VETable3b                          ;* VETable3b = 0
 ;*        beq     No_VE_Table_3
 ;*        jsr     Check_VE3_Table
 
 ;*No_VE_Table_3:
 ;*        lda   feature3_f
-;*        bit   #TargetAFRb
+;*        bit   #TargetAFRb                          ;* TargetAFRb = 1
 ;*        beq   No_AFRTar_VE1
                             ; Are we using the
 							; target afrs for
 							; table 1?
         jsr     AFR1_Targets; Get Target AFR
 							; from table 1 for VE 1
-;*NO_AfrTar_VE1:
+NO_AfrTar_VE1:
 ;*        lda   feature6_f
-;*        bit   #TargetAFR3b
+;*        bit   #TargetAFR3b                        ;* TargetAFR3b = 0
 ;*        beq   No_AfrTar_VE3
 ;*        jsr     AFR2_Targets; Are we using the
 							; target afrs for
 							; table 3?
             				; Get Target AFR
 							; from table 2 for VE 3
-;*No_AfrTar_VE3:
+No_AfrTar_VE3:
         brset   running,engine,nospkoff   ; skip next check
         ;if not running then make sure all spark outputs are OFF
         ;this is a bandaid, but better safe than sorry
         jsr     turnallsparkoff     ; subroutine to stop them all
 nospkoff:
-;*        lda    personality_f
+;*        lda    personality_f                            ;* personality_f = 4T
 ;*        beq    No_misc_Spark
         jsr    misc_spark                              ; dwell and other bits
 
@@ -5454,33 +5484,35 @@ troll_ck_done:
 ***************************************************************************
 
 crankingMode:
-;*         brclr    running,engine,ExtraFuelCrank   ; We are stopped so do we add
-                                                  ; extra fuel whilst cranking
-	brclr    running,engine,floodClear
+         brclr    running,engine,ExtraFuelCrank   ; We are stopped so do we add
+                                                  ; extra fuel whilst cranking?
 
 crankingModePrime:
-    bset    crank,engine		; Turn on cranking mode.
-    bclr    startw,engine		; Turn off ASE mode.
-    bclr    warmup,engine		; Turn off WUE mode.
-    lda     tps			        ; ~70% comparison value for throttle
-					            ; - flood clear trigger
-    cmp     tpsflood_f
-    blo     crankingPW
-    clr     TCAccel
+        bset    crank,engine		; Turn on cranking mode.
+        bclr    startw,engine		; Turn off ASE mode.
+        bclr    warmup,engine		; Turn off WUE mode.
+
+        lda     tps			; ~70% comparison value for throttle
+					; - flood clear trigger
+        cmp     tpsflood_f                                     ;* tpsflood = 243T
+        blo     crankingPW
+        clr     TCAccel
 
 floodClear:
-    clra				        ; Turn off pulses altogether.
-    jmp     crankingDone
+        clra				; Turn off pulses altogether.
+        jmp     crankingDone
 
 ; Extra Fueling for Cranking! This is triggered if the TPS goes above the floodclear
 ; value 3 times before starting. Were using the NosDcOk Bit as its not used at cranking.
 ; Were also using various Traction Bytes too. All this to save RAM.
 
-;*ExtraFuelCrank:
+ExtraFuelCrank:
 ;*        lda     feature11_f4
-;*        bit     #ExCrFuelb
+;*        bit     #ExCrFuelb                                                 ;* ExCrFuelb = 0
 ;*        beq     floodClear              ; If Extra Cranking Fuel not selected then
                                         ; carry on as normal
+
+        bra     floodClear   ;* RJH 7/25/23
 
 ;*        lda     tps
 ;*        cmp     tpsflood_f
@@ -5493,7 +5525,7 @@ floodClear:
 ;*        blo     floodClear                          ; If we havent done it 3 times then clear PW
 ;*        lda     ExtraCrFu_f
 ;*        sta     TCAccel
-;*        bra     floodClear
+
 
 ;*HighTPS:
 
@@ -5514,9 +5546,9 @@ crankingPW:
 ;        lda     cwh_f1
 ;        sta     liY2
 
-;* choose coolant, airtemp or average
+; choose coolant, airtemp or average
 ;*        lda     feature11_f4
-;*        bit     #matcrankb
+;*        bit     #matcrankb                                       ;* matcrankb = 0
 ;*        bne     crpwmat
 ;*crpwclt:				; if cltcrank bit is 1 or 0
         lda     coolant
@@ -5528,7 +5560,7 @@ crankingPW:
 ;*        bit     #cltcrankb
 ;*        beq     CltOnlyPulse
 ;*        lda     airtemp
- ;*       add     coolant
+;*        add     coolant
 ;*;        bcc     Clt_IAT_NOFlow   ; why ????
 ;*;        lda     #255T
 ;*;Clt_IAT_NOFlow:
@@ -5538,55 +5570,57 @@ crankingPW:
 ;*CltOnlyPulse:
 ;*        lda     airtemp                 ; Air Temp only
 ;*crpwint:
-    sta     liX
+        sta     liX
 
 ; Table look up for Cranking PW, liX already contains temperature to look for - PR
+        mov     liX,tmp4		; tmp4 holds the variable to look
+					; for in the lookup table
+        mov     liX,tmp10		; Save away for later use below
+        ldhx    #WWURANGE
+        sthx    tmp1
+        mov     #$09,tmp3		; 10 bits wide
+        jsr     tableLookup		; This finds the bins when the
+					; temperatures are set
 
-    mov     liX,tmp4		; tmp4 holds the variable to look
-					        ; for in the lookup table
-    mov     liX,tmp10		; Save away for later use below
-    ldhx    #WWURANGE
-    sthx    tmp1
-    mov     #$09,tmp3		; 10 bits wide
-    jsr     tableLookup		; This finds the bins when the
-					        ; temperatures are set
-    clrh
-    ldx     tmp5
-    lda     CrankPWs_f,x
-    sta     liY2
-    decx
-    lda     CrankPWs_f,x	; This finds the values for the
-					        ; PW at the above temperatures
-    sta     liY1
-    mov     tmp10,liX
-    jsr     LinInterp
+        clrh
+        ldx     tmp5
+
+        lda     CrankPWs_f,x
+        sta     liY2
+        decx
+        lda     CrankPWs_f,x		; This finds the values for the
+					; PW at the above temperatures
+        sta     liY1
+        mov     tmp10,liX
+
+        jsr     LinInterp
 
 ; If TCAccel > 0 then we are multiplying the Crank PW by it
 
-    lda     TCAccel
-    beq     MultiFacCrank   ; Do we have a value to use?
-    sta     tmp10
-    clr     tmp11
-    lda     tmp6
-    sta     tmp12
-    clr     tmp13
-    jsr     Supernorm
-    lda     tmp10
-    add     tmp6            ; Add original PW back
-    bra     crankingDone
+        lda     TCAccel
+        beq     MultiFacCrank            ; Do we have a value to use?
+        sta     tmp10
+        clr     tmp11
+        lda     tmp6
+        sta     tmp12
+        clr     tmp13
+        jsr     Supernorm
+        lda     tmp10
+        add     tmp6                    ; Add original PW back
+        bra     crankingDone
 
 MultiFacCrank:
-    lda     tmp6			; Leave it where expected.
+        lda     tmp6			; Leave it where expected.
 
 crankingDone:
+    ;    sta     egtadc
         sta     tmp1
-;*        brclr   CrankingPW2,feature1,no_crankpw2
+;*        brclr   CrankingPW2,feature1,no_crankpw2                ;* CrankingPW2 = 1
         sta     tmp2			; Pulse bank 2 just like bank 1.
        rts
 ;*no_crankpw2:
-;*       clr     tmp2			; Zero out bank 2 while cranking.
+;*        clr     tmp2			; Zero out bank 2 while cranking.
 ;*        rts
-
 
 
 ***************************************************************************
@@ -5599,70 +5633,70 @@ crankingDone:
 ** ScaleFac = Primary inj size /(Prim + Sec inj size) * 512, should always
 ** be <=255.  If identically sized injectors, use 255.
 ***************************************************************************
-;*CALC_STAGED_PW:
-;*        lda     tmp11
-;*        add     TPSACCEL
-;*	add	NosPW
-;*        bcs     MAX_PWM_ALLOWED2
-;*        tax				; move calc'd pw to x-register
-;*        lda     SCALEFAC_f		; load SCALEFAC constant into
+CALC_STAGED_PW:
+        lda     tmp11
+        add     TPSACCEL
+	add	NosPW
+        bcs     MAX_PWM_ALLOWED2
+        tax				; move calc'd pw to x-register
+        lda     SCALEFAC_f		; load SCALEFAC constant into
 					; accumulator
-;*        mul				; multipy the two together,
+        mul				; multipy the two together,
 					; 16-bit result in x:a
-;*        txa				; transfer high byte of
+        txa				; transfer high byte of
 					; pw*ScaleFac to accumlator,
 					; overwriting existing lower byte.
-;*        lsra				; Shift bit pattern to the right
-;*        bcc     NO_INC			; if carry bit clear, skip increment
-;*        inca				; otherwise, increment accumulator
-;*NO_INC:
-;*        add     tmp6			; then add open time
-;*        bcc     FINISHED_PW_COMP
-;*MAX_PWM_ALLOWED2:			; THIS SHOULD NEVER HAPPEN
-;*        lda     #$FE
-;*FINISHED_PW_COMP:
-;*        sta     pw_staged
+        lsra				; Shift bit pattern to the right
+        bcc     NO_INC			; if carry bit clear, skip increment
+        inca				; otherwise, increment accumulator
+NO_INC:
+        add     tmp6			; then add open time
+        bcc     FINISHED_PW_COMP
+MAX_PWM_ALLOWED2:			; THIS SHOULD NEVER HAPPEN
+        lda     #$FE
+FINISHED_PW_COMP:
+        sta     pw_staged
 	; figure out how much to bring in during each pw scheduling time.
-;*	lda	StgCycles_f
+	lda	StgCycles_f
 ; redundant	cmp	#00T
-;*	beq	staged_same		; if gradual transition is off branch
+	beq	staged_same		; if gradual transition is off branch
 
 	; if the transition is done, branch
-;*        brset	StgTransDone,EnhancedBits6,staged_same
+        brset	StgTransDone,EnhancedBits6,staged_same
 
 	; calculate the secondary pulse-width using the following formula:
 	; pw_staged2 = (((pw_staged - tmp6 + TPSACCEL) / StgCycles_f)
 	;		  * stgTransitionCnt) +	tmp6)
 
-;*	pshh
-;*	tax
-;*	lda	pw_staged
-;*        sta     tmp22        ; stash a copy of pw_staged in tmp22
-;*	sub	tmp6
-;*	add	TPSACCEL
-;*	add	NosPW
-;*	clrh
-;*	div
-;*	cmp	#00T
-;*	bne	continue_pw_2
-;*	lda	#1T		; the div resulted in a 0 answer, round up
+	pshh
+	tax
+	lda	pw_staged
+        sta     tmp22        ; stash a copy of pw_staged in tmp22
+	sub	tmp6
+	add	TPSACCEL
+	add	NosPW
+	clrh
+	div
+	cmp	#00T
+	bne	continue_pw_2
+	lda	#1T		; the div resulted in a 0 answer, round up
 	; ok, now we have in the a register, the amt to add to secondary
 	; during every ignition event, so do it
-;*continue_pw_2:
-;*	tax
-;*	lda	stgTransitionCnt
+continue_pw_2:
+	tax
+	lda	stgTransitionCnt
 				  ; if the count is 0, change to 1 to avoid
 				  ; instant transition
 ; redundant	cmp	#00T
-;*	bne	continue_mul_2
-;*	lda	#1T
-;*	sta	stgTransitionCnt
-;*continue_mul_2:
-;*	mul
+	bne	continue_mul_2
+	lda	#1T
+	sta	stgTransitionCnt
+continue_mul_2:
+	mul
 	; now we have the amt to set pw_staged2 to
 	; add back the open time
-;*	add	tmp6
-;*	sta	pw_staged2
+	add	tmp6
+	sta	pw_staged2
 
 	; now figure it out for pw_staged using the following formula
 	; (tmp11 - ((((tmp11 + tmp6 + TPSACCEL) - pw_staged) / StgCycles_f) *
@@ -5671,49 +5705,49 @@ crankingDone:
         ; has the open time in it, and adding the open time to tmp 11 will
         ; give us the time without the open-time when we subtract.
 
-;*	lda	StgCycles_f
-;*	tax
-;*	lda	tmp11
-;*	add	tmp6
-;*	add	TPSACCEL    ; add this since it was included in calc for pw_staged
-;*	add	NosPW
-;*	sub	pw_staged   ; figure out how far to go from tmp11 to pw_staged
-;*	clrh
-;*	div		    ; then figure out how much per step
-;*	cmp	#00T
-;*	bne	continue_pw_1	; the div resulted in a 0 answer, round up
-;*	lda	#1T
-;*continue_pw_1:
-;*	tax
-;*	lda	stgTransitionCnt
-;*	mul 		    ; calculate the amount to subtract from tmp11
-;*	sta	pw_staged   ; use pw_staged as temporary storage
-;*	lda	tmp11
-;*	add	TPSACCEL
-;*	sub	pw_staged
-;*	add	tmp6
-;*	sta	pw_staged
+	lda	StgCycles_f
+	tax
+	lda	tmp11
+	add	tmp6
+	add	TPSACCEL    ; add this since it was included in calc for pw_staged
+	add	NosPW
+	sub	pw_staged   ; figure out how far to go from tmp11 to pw_staged
+	clrh
+	div		    ; then figure out how much per step
+	cmp	#00T
+	bne	continue_pw_1	; the div resulted in a 0 answer, round up
+	lda	#1T
+continue_pw_1:
+	tax
+	lda	stgTransitionCnt
+	mul 		    ; calculate the amount to subtract from tmp11
+	sta	pw_staged   ; use pw_staged as temporary storage
+	lda	tmp11
+	add	TPSACCEL
+	sub	pw_staged
+	add	tmp6
+	sta	pw_staged
 
-;*	cmp	pw_staged2   ; if pw_staged2 is greater than pw_staged,
+	cmp	pw_staged2   ; if pw_staged2 is greater than pw_staged,
 			     ; we probably rounded, so use the original
 			     ; pw_staged instead
-;*	pulh
+	pulh
 
-;*	bhi	check_staged_on	; we're done here, go see if staging should be
+	bhi	check_staged_on	; we're done here, go see if staging should be
 	                        ; on or not.
 
-;*staged_early_done:
-;*        lda     tmp22   ; overshot so use the value we saved earlier
-;*	sta	pw_staged	; store here in case staged_same not executed
-;*        bra     ss_s
+staged_early_done:
+        lda     tmp22   ; overshot so use the value we saved earlier
+	sta	pw_staged	; store here in case staged_same not executed
+        bra     ss_s
 
-;*staged_same:
+staged_same:
 	; gradual transition is off or the transition is done, set the done bit
 	; so the count stops
-;*	lda	pw_staged
-;*ss_s:
-;*	sta	pw_staged2
-;*	bset	StgTransDone,EnhancedBits6
+	lda	pw_staged
+ss_s:
+	sta	pw_staged2
+	bset	StgTransDone,EnhancedBits6
 
 ***************************************************************************
 **
@@ -5727,76 +5761,76 @@ crankingDone:
 ** transition phase.
 **
 ***************************************************************************
-;*check_staged_on:
-;*        lda     feature5_f
-;*        bit     #stagedModeb
-;*        bne     LastCheck   ; If this bit is set then not RPM
+check_staged_on:
+        lda     feature5_f
+        bit     #stagedModeb
+        bne     LastCheck   ; If this bit is set then not RPM
 
-;*        lda     STGTRANS_f		; RPM-based staging
-;*        cmp     rpm
-;*        bls     STAGED_ON
-;*        sub     STGDELTA_f
-;*        cmp     rpm
-;*        bhs     STAGED_OFF
-;*        rts
+        lda     STGTRANS_f		; RPM-based staging
+        cmp     rpm
+        bls     STAGED_ON
+        sub     STGDELTA_f
+        cmp     rpm
+        bhs     STAGED_OFF
+        rts
 
-;*LastCheck:
-;*        lda     feature5_f
-;*        bit     #stagedb
-;*        beq     MAPSTAGED ; If this bit is set then not TPS
+LastCheck:
+        lda     feature5_f
+        bit     #stagedb
+        beq     MAPSTAGED ; If this bit is set then not TPS
 
-;*        lda     tps			; TPS-based staging
-;*        cmp     STGTRANS_f
-;*        bhs     STAGED_ON
-;*        lda     STGTRANS_f
-;*        sub     STGDELTA_f
-;*        cmp     tps
-;*        bhs     STAGED_OFF
-;*        rts
+        lda     tps			; TPS-based staging
+        cmp     STGTRANS_f
+        bhs     STAGED_ON
+        lda     STGTRANS_f
+        sub     STGDELTA_f
+        cmp     tps
+        bhs     STAGED_OFF
+        rts
 
-;*MAPSTAGED:				; Must be MAP Based staging
-;*        lda     STGTRANS_f
-;*        cmp     kpa
-;*        bls     STAGED_ON
-;*        sub     STGDELTA_f
-;*        cmp     kpa
-;*        bhs     STAGED_OFF
-;*        rts
+MAPSTAGED:				; Must be MAP Based staging
+        lda     STGTRANS_f
+        cmp     kpa
+        bls     STAGED_ON
+        sub     STGDELTA_f
+        cmp     kpa
+        bhs     STAGED_OFF
+        rts
 
-;*STAGED_ON:				; set staged bit to 1
-;*	brclr	StagedMAP2nd,feature7,cont_staged_on
-;*	brclr	StagedAnd,feature7,cont_staged_on
+STAGED_ON:				; set staged bit to 1
+	brclr	StagedMAP2nd,feature7,cont_staged_on
+	brclr	StagedAnd,feature7,cont_staged_on
 	; if here, both parameters must be on to turn on staging
 
-;*check_2nd_param:
-;*	lda	Stg2ndParmKPA_f
-;*	cmp	kpa
-;*	bls	cont_staged_on
-;*	sub	Stg2ndParmDlt_f
-;*	cmp	kpa
-;*	bhs	cont_staged_off
-;*	rts	;shouldn't get here
+check_2nd_param:
+	lda	Stg2ndParmKPA_f
+	cmp	kpa
+	bls	cont_staged_on
+	sub	Stg2ndParmDlt_f
+	cmp	kpa
+	bhs	cont_staged_off
+	rts	;shouldn't get here
 
-;*cont_staged_on:
-;*        bset    REStaging,EnhancedBits
-;*        rts
+cont_staged_on:
+        bset    REStaging,EnhancedBits
+        rts
 
-;*STAGED_OFF:				; clear bit
-;*	brclr	StagedMAP2nd,feature7,cont_staged_off
+STAGED_OFF:				; clear bit
+	brclr	StagedMAP2nd,feature7,cont_staged_off
 	; if we get here, we need to see if And is on, because if it is
 	; we want to turn off staging... if it isn't, we want to see
  	; if staging should be on
-;*	brset	StagedAnd,feature7,cont_staged_off
-;*	bra	check_2nd_param
+	brset	StagedAnd,feature7,cont_staged_off
+	bra	check_2nd_param
 
-;*cont_staged_off:
-;*        bclr    REStaging,EnhancedBits
-;*	clra
-;*	sta	stgTransitionCnt	; staged is off, clear the staging
+cont_staged_off:
+        bclr    REStaging,EnhancedBits
+	clra
+	sta	stgTransitionCnt	; staged is off, clear the staging
 					; transition count
-;*	sta	pw_staged2
-;*	bclr	StgTransDone,EnhancedBits6
-;*        rts
+	sta	pw_staged2
+	bclr	StgTransDone,EnhancedBits6
+        rts
 
 
 
@@ -5840,7 +5874,7 @@ VE_STEP_6:
 ; 022i - commented out until they get fixed
 
 					; boost control TABLE 1
-;*$MACRO bc1X				; gets a byte from page8 or RAM.
+$MACRO bc1X				; gets a byte from page8 or RAM.
 					; On entry X contains index.
 					; Returns byte in A
 ;        lda     page
@@ -5848,12 +5882,12 @@ VE_STEP_6:
 ;        bne     ve7xf
 ;        lda     VE_r,x
 ;        bra     ve7xc
-;*ve7xf:  lda     bc_kpa_f,x
-;*ve7xc:
-;*$MACROEND
+ve7xf:  lda     bc_kpa_f,x
+ve7xc:
+$MACROEND
 
 					; boost control TABLE 2
-;*$MACRO bc2X				; gets a byte from page8 or RAM.
+$MACRO bc2X				; gets a byte from page8 or RAM.
 					; On entry X contains index.
 					; Returns byte in A
 ;        lda     page
@@ -5861,13 +5895,13 @@ VE_STEP_6:
 ;        bne     ve8xf
 ;        lda     VE_r,x
 ;        bra     ve8xc
-;*ve8xf:  lda     bc_dc_f,x
-;*ve8xc:
-;*$MACROEND
+ve8xf:  lda     bc_dc_f,x
+ve8xc:
+$MACROEND
 
 					; boost control TABLE 3 for
 					; switching boost table on the run
-;*$MACRO bc3X				; gets a byte from page8 or RAM.
+$MACRO bc3X				; gets a byte from page8 or RAM.
 					; On entry X contains index.
 					; Returns byte in A
 ;        lda     page
@@ -5875,9 +5909,9 @@ VE_STEP_6:
 ;        bne     ve9xf
 ;        lda     VE_r,x
 ;        bra     ve9xc
-;*ve9xf:  lda     bc3_kpa_f,x
-;*ve9xc:
-;*$MACROEND
+ve9xf:  lda     bc3_kpa_f,x
+ve9xc:
+$MACROEND
 
 					; rotary trailing split					; switching boost table on the run
 $MACRO rs1X				; gets a byte from flash or RAM.
@@ -5893,13 +5927,13 @@ rs1xf:  lda     split_f,x
 rs1xc:
 $MACROEND
 
-;****************
-;*; a few boost bits up here to be relative
-;*boostZero:
-;*        clra
-;*        sta    bcDC
-;*boostDone_dupe:
-;*        rts
+***************
+; a few boost bits up here to be relative
+boostZero:
+        clra
+        sta    bcDC
+boostDone_dupe:
+        rts
 
 ***************************************************************************
 ** Boost Controller
@@ -5919,150 +5953,150 @@ $MACROEND
 **
 ***************************************************************************
 
-;*bcSetPoint equ  tmp6
-;*bcDelta    equ  tmp7
-;*bcP        equ  tmp8
+bcSetPoint equ  tmp6
+bcDelta    equ  tmp7
+bcP        equ  tmp8
 
-;*CalcBoostDC:
+CalcBoostDC:
 
-;*        lda     kpa
-;*        cmp     Pambient
-;*        blo     boostZero		; If no boost sensed, don't burn
+        lda     kpa
+        cmp     Pambient
+        blo     boostZero		; If no boost sensed, don't burn
 					; up the solenoid.
 					; is this good or bad??
 
-;*        lda     bcCtlClock		; RTC-based updates.
+        lda     bcCtlClock		; RTC-based updates.
 					; Would it be better to use engine revs
-;*        cmp     bcUpdate_f		; See if our clock has expired
-;*        blo     boostDone_dupe
-;*        clr     bcCtlClock
+        cmp     bcUpdate_f		; See if our clock has expired
+        blo     boostDone_dupe
+        clr     bcCtlClock
 
 **************************************************************************
 **  Compute the target boost value based upon TPS and RPM 6x6 table
 **************************************************************************
 
 					; boost control ALWAYS page 8
-;*        mov     tps,kpa_n		; (kpa_n also used in VE_STEP4)
+        mov     tps,kpa_n		; (kpa_n also used in VE_STEP4)
 
-;*;        brclr   BoostTable3,feature8,BoostT1
-;*        lda     feature8_f
-;*        bit     #BoostTable3b
-;*        beq     BoostT1
+;        brclr   BoostTable3,feature8,BoostT1
+        lda     feature8_f
+        bit     #BoostTable3b
+        beq     BoostT1
 
-;*        brclr   NosIn,portd,Table3_Boost; If using Boost Table 3 and input
+        brclr   NosIn,portd,Table3_Boost; If using Boost Table 3 and input
 					; low then its time to use it
 
 ;bc1_STEP_1:
-;*BoostT1:
-;*        ldhx    #TPSRANGEbc_f
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     kpa_n,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp8		; Index
-;*        mov     tmp1,tmp9		; X1
-;*        mov     tmp2,tmp10		; X2
+BoostT1:
+        ldhx    #TPSRANGEbc_f
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     kpa_n,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp8		; Index
+        mov     tmp1,tmp9		; X1
+        mov     tmp2,tmp10		; X2
 
-;*bc1_STEP_2:
-;*        ldhx    #RPMRANGEbc_f
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     rpm,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp11		; Index
-;*        mov     tmp1,tmp13		; X1
-;*        mov     tmp2,tmp14		; X2
-;*        bra     bc1_STEP_3
+bc1_STEP_2:
+        ldhx    #RPMRANGEbc_f
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     rpm,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp11		; Index
+        mov     tmp1,tmp13		; X1
+        mov     tmp2,tmp14		; X2
+        bra     bc1_STEP_3
 
-;*Table3_Boost:
-;*        bra    Table3_Boost_J		; Jump
+Table3_Boost:
+        bra    Table3_Boost_J		; Jump
 
-;*bc1_STEP_3:
-;*        clrh
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        deca
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc1X
-;*        sta     tmp15
-;*        incx
-;*        bc1X
-;*        sta     tmp16
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc1X
-;*        sta     tmp17
-;*        incx
-;*        bc1X
-;*        sta     tmp18
+bc1_STEP_3:
+        clrh
+        ldx     #$06			; 6x6
+        lda     tmp8
+        deca
+        mul
+        add     tmp11
+        deca
+        tax
+        bc1X
+        sta     tmp15
+        incx
+        bc1X
+        sta     tmp16
+        ldx     #$06			; 6x6
+        lda     tmp8
+        mul
+        add     tmp11
+        deca
+        tax
+        bc1X
+        sta     tmp17
+        incx
+        bc1X
+        sta     tmp18
 
-;*        jsr     VE_STEP_4
-;*        bra     No_BTable_3_J
-;*;       result in tmp6, equ'd above to be bcSetPoint
+        jsr     VE_STEP_4
+        bra     No_BTable_3_J
+;       result in tmp6, equ'd above to be bcSetPoint
 
 *****************************************************************************
 **  Extra Boost Target Table put in for switching over on the run
 *****************************************************************************
 					; bc3_STEP_1:
-;*Table3_Boost_J:
-;*        ldhx    #TPSRANGE3bc_f
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     kpa_n,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp8		; Index
-;*        mov     tmp1,tmp9		; X1
-;*        mov     tmp2,tmp10		; X2
+Table3_Boost_J:
+        ldhx    #TPSRANGE3bc_f
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     kpa_n,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp8		; Index
+        mov     tmp1,tmp9		; X1
+        mov     tmp2,tmp10		; X2
 
-;*bc3_STEP_2:
-;*        ldhx    #RPMRANGE3bc_f
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     rpm,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp11		; Index
-;*        mov     tmp1,tmp13		; X1
-;*        mov     tmp2,tmp14		; X2
-;*        bra     bc3_STEP_3
+bc3_STEP_2:
+        ldhx    #RPMRANGE3bc_f
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     rpm,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp11		; Index
+        mov     tmp1,tmp13		; X1
+        mov     tmp2,tmp14		; X2
+        bra     bc3_STEP_3
 
-;*No_BTable_3_J:
-;*        bra     No_BTable_3		; Jump
+No_BTable_3_J:
+        bra     No_BTable_3		; Jump
 
-;*bc3_STEP_3:
-;*        clrh
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        deca
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc3X
-;*        sta     tmp15
-;*        incx
-;*        bc3X
-;*        sta     tmp16
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc3X
-;*        sta     tmp17
-;*        incx
-;*        bc3X
-;*        sta     tmp18
-;*        jsr     VE_STEP_4
+bc3_STEP_3:
+        clrh
+        ldx     #$06			; 6x6
+        lda     tmp8
+        deca
+        mul
+        add     tmp11
+        deca
+        tax
+        bc3X
+        sta     tmp15
+        incx
+        bc3X
+        sta     tmp16
+        ldx     #$06			; 6x6
+        lda     tmp8
+        mul
+        add     tmp11
+        deca
+        tax
+        bc3X
+        sta     tmp17
+        incx
+        bc3X
+        sta     tmp18
+        jsr     VE_STEP_4
 
-;*No_BTable_3:
+No_BTable_3:
 					; result in tmp6, equ'd above to
 					; be bcSetPoint
 *****************************************************************************
@@ -6070,10 +6104,10 @@ $MACROEND
 *****************************************************************************
 					; The real boost controller,
 					; compute delta.
-;*        lda     bcSetPoint
-;*        sub     KnockBoost		; Subtract boost target with knock
+        lda     bcSetPoint
+        sub     KnockBoost		; Subtract boost target with knock
 					; detection boost value
-;*        sta     bcSetPoint
+        sta     bcSetPoint
 
 *****************************************************************************
 **
@@ -6081,52 +6115,52 @@ $MACROEND
 **  above setpoint
 **
 *****************************************************************************
-;*      clr   tmp31
-;*      lda   iatBoostSt_f
-;*      beq   noBoostIAT			; If zero then dont go any further.
-;*      lda   iatBoost_f			; load the temp per 1 psi to remove.
-;*      beq   noBoostIAT			; If zero then dont go any further.
-;*      lsra				; Shift bit pattern to the right
+      clr   tmp31
+      lda   iatBoostSt_f
+      beq   noBoostIAT			; If zero then dont go any further.
+      lda   iatBoost_f			; load the temp per 1 psi to remove.
+      beq   noBoostIAT			; If zero then dont go any further.
+      lsra				; Shift bit pattern to the right
 					; (Divide by 2)
-;*      bcc   no_carry_B			; Check if carry bit clear,
+      bcc   no_carry_B			; Check if carry bit clear,
 					; skip increment
 
-;*      inca				; otherwise, increment accumulator
+      inca				; otherwise, increment accumulator
 
-;*no_carry_B:
-;*      sta   tmp32			; Stores half the iatDeg
+no_carry_B:
+      sta   tmp32			; Stores half the iatDeg
 
-;*      lda   tps
-;*      cmp   tpsBooIAT_f			; Setpoint of tps for boost reduction
-;*      blo   noBoostIAT
+      lda   tps
+      cmp   tpsBooIAT_f			; Setpoint of tps for boost reduction
+      blo   noBoostIAT
 
-;*      lda   airTemp			; Actual IAT Temp
-;*      cmp   iatBoostSt_f		; Setpoint for start of Boost removal
-;*      blo   noBoostIAT
+      lda   airTemp			; Actual IAT Temp
+      cmp   iatBoostSt_f		; Setpoint for start of Boost removal
+      blo   noBoostIAT
 
-;*      sub   iatBoostSt_f		; How much higher are we?
+      sub   iatBoostSt_f		; How much higher are we?
 					; Leaves difference in accumulator
-;*      clrh				; Zero out high 8 bits of 16-bit
+      clrh				; Zero out high 8 bits of 16-bit
 					; H:X register
 					; Accumulator contains low 8 bits
-;*      ldx   iatBoost_f			; Set divisor
-;*      div				; (H:A) /X -> A, with rem in H
+      ldx   iatBoost_f			; Set divisor
+      div				; (H:A) /X -> A, with rem in H
 
-;*      tax				; Move quotient to index register
-;*      pshh				; Transfer remainder to accumulator
-;*      pula
-;*      cmp   tmp32			; See if the remainder is more
+      tax				; Move quotient to index register
+      pshh				; Transfer remainder to accumulator
+      pula
+      cmp   tmp32			; See if the remainder is more
 					; than half of divisor
-;*      blo   FinishBIAT
-;*      incx				; It was a big remainder, round up.
-;*FinishBIAT:
-;*      lda  #07T				; Multiply by 7 KPa (1PSI)
-;*      mul
-;*      sta  tmp31			; Boost to remove
-;*      lda  bcSetPoint
-;*      sub  tmp31
-;*      sta  bcSetPoint			; New boost target
-;*noBoostIAT:
+      blo   FinishBIAT
+      incx				; It was a big remainder, round up.
+FinishBIAT:
+      lda  #07T				; Multiply by 7 KPa (1PSI)
+      mul
+      sta  tmp31			; Boost to remove
+      lda  bcSetPoint
+      sub  tmp31
+      sta  bcSetPoint			; New boost target
+noBoostIAT:
 
 *****************************************************************************
 ** Matt Dupuis idea
@@ -6136,139 +6170,139 @@ $MACROEND
 ** max diff to zero
 *****************************************************************************
 
-;*        lda     kpa			; Calc P for our PD controller.
-;*        sub     bcSetPoint		; result from interpolate tmp6
-;*        bcc     mboostPos
-;*        nega
-;*mboostPos:
-;*        cmp     bc_max_diff
-;*        bhi     boost_fixed
+        lda     kpa			; Calc P for our PD controller.
+        sub     bcSetPoint		; result from interpolate tmp6
+        bcc     mboostPos
+        nega
+mboostPos:
+        cmp     bc_max_diff
+        bhi     boost_fixed
 
-;*bc_eric:
-;*;Originated Eric Fahlgren, closed loop method
-;*        bclr    bcTableUse,squirt
-;*        lda     kpa			; Calc P for our PD controller.
-;*        sub     bcSetPoint		; result from interpolate tmp6
-;*        bcc     boostPos
-;*        nega
-;*boostPos:
-;*        ldx     bcPgain_f		; Proportional Gain in percent,
+bc_eric:
+;Originated Eric Fahlgren, closed loop method
+        bclr    bcTableUse,squirt
+        lda     kpa			; Calc P for our PD controller.
+        sub     bcSetPoint		; result from interpolate tmp6
+        bcc     boostPos
+        nega
+boostPos:
+        ldx     bcPgain_f		; Proportional Gain in percent,
 					; 255=100%.
-;*        mul				; returns in x:a
-;*        stx     bcP			; just high byte
+        mul				; returns in x:a
+        stx     bcP			; just high byte
 				; bcP = abs(kpa-bcSetpoint) * (Pgain / 256)
 
-;*        lda     kpa			; now calc 'kpadot' in here at
+        lda     kpa			; now calc 'kpadot' in here at
 					; same rate
-;*        sub     kpalast
-;*        bcc     kpadotPos
-;*        nega
-;*kpadotPos:
-;*        ldx     bcDgain_f		; Differential Gain
-;*        mul
-;*        txa
-;*        nega				; =  - abs(kpa-kpalast) * (dGain/255)
+        sub     kpalast
+        bcc     kpadotPos
+        nega
+kpadotPos:
+        ldx     bcDgain_f		; Differential Gain
+        mul
+        txa
+        nega				; =  - abs(kpa-kpalast) * (dGain/255)
 
-;*        add     bcP
-;*        sta     bcDelta			; p term - d term
+        add     bcP
+        sta     bcDelta			; p term - d term
 
 *****************************************************************************
 ** We now have a setpoint and a delta, so adjust the duty cycle.
 *****************************************************************************
 
-;*        lda     kpa
-;*        cmp     bcSetPoint
-;*        blo     boostInc		; going up
-;*        bra     boostDec		; coming down
+        lda     kpa
+        cmp     bcSetPoint
+        blo     boostInc		; going up
+        bra     boostDec		; coming down
 
-;*boostDec:
-;*        lda     bcDC
-;*        sub     bcDelta
-;*        bcs     boostZero2
-;*        bra     boostSet
+boostDec:
+        lda     bcDC
+        sub     bcDelta
+        bcs     boostZero2
+        bra     boostSet
 
-;*boostInc:
-;*        lda     bcDC
-;*        add     bcDelta
-;*        bcs     boostRail
-;*        bra     boostSet
+boostInc:
+        lda     bcDC
+        add     bcDelta
+        bcs     boostRail
+        bra     boostSet
 
-;*boostRail:
-;*        lda     #255T
-;*        bra     boostSet
+boostRail:
+        lda     #255T
+        bra     boostSet
 
-;*boostZero2:
-;*        clra
+boostZero2:
+        clra
 
-;*boostSet:
-;*        sta    bcDC
-;*boostDone:
-;*        mov     kpa,kpalast
-;*        rts
+boostSet:
+        sta    bcDC
+boostDone:
+        mov     kpa,kpalast
+        rts
 
-;*boost_fixed:
+boost_fixed:
 ;lookup fixed duty cycle from table. 'out of range' open loop duty
 
 ;boost control ALWAYS page 8
-;*        bset    bcTableUse,squirt
-;*        mov     tps,kpa_n		; (kpa_n also used in VE_STEP4)
+        bset    bcTableUse,squirt
+        mov     tps,kpa_n		; (kpa_n also used in VE_STEP4)
 ;bc2_STEP_1:
-;*        ldhx    #TPSRANGEbc_f2
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     kpa_n,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp8		; Index
-;*        mov     tmp1,tmp9		; Y1
-;*        mov     tmp2,tmp10		; Y2
+        ldhx    #TPSRANGEbc_f2
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     kpa_n,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp8		; Index
+        mov     tmp1,tmp9		; Y1
+        mov     tmp2,tmp10		; Y2
 
-;*bc2_STEP_2:
-;*        ldhx    #RPMRANGEbc_f2
-;*        sthx    tmp1
-;*        mov     #$05,tmp3		; 6x6
-;*        mov     rpm,tmp4
-;*        jsr     tableLookup
-;*        mov     tmp5,tmp11		; Index
-;*        mov     tmp1,tmp13		; X1
-;*        mov     tmp2,tmp14		; X2
+bc2_STEP_2:
+        ldhx    #RPMRANGEbc_f2
+        sthx    tmp1
+        mov     #$05,tmp3		; 6x6
+        mov     rpm,tmp4
+        jsr     tableLookup
+        mov     tmp5,tmp11		; Index
+        mov     tmp1,tmp13		; X1
+        mov     tmp2,tmp14		; X2
 
-;*bc2_STEP_3:
+bc2_STEP_3:
 
-;*        clrh
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        deca
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc2X
-;*        sta     tmp15
-;*        incx
-;*        bc2X
-;*        sta     tmp16
-;*        ldx     #$06			; 6x6
-;*        lda     tmp8
-;*        mul
-;*        add     tmp11
-;*        deca
-;*        tax
-;*        bc2X
-;*        sta     tmp17
-;*        incx
-;*        bc2X
-;*        sta     tmp18
+        clrh
+        ldx     #$06			; 6x6
+        lda     tmp8
+        deca
+        mul
+        add     tmp11
+        deca
+        tax
+        bc2X
+        sta     tmp15
+        incx
+        bc2X
+        sta     tmp16
+        ldx     #$06			; 6x6
+        lda     tmp8
+        mul
+        add     tmp11
+        deca
+        tax
+        bc2X
+        sta     tmp17
+        incx
+        bc2X
+        sta     tmp18
 
-;*        jsr     VE_STEP_4
-;*        mov     tmp6,bcDC
-;*        mov     kpa,kpalast
-;*        rts
+        jsr     VE_STEP_4
+        mov     tmp6,bcDC
+        mov     kpa,kpalast
+        rts
 ***************************************************************************
 
 $MACRO TurnAllSpkOff			; gets called in stall or on
 					; entering bootloader mode
 					;turn spark outputs to inactive
-        brclr    invspk,EnhancedBits4,soin
+;*        brclr    invspk,EnhancedBits4,soin                 ;* invspk = 1
         ; inverting easy, just put all to zero
         bclr     iasc,porta
         bclr     sled,portc
@@ -6278,38 +6312,38 @@ $MACRO TurnAllSpkOff			; gets called in stall or on
         bclr     pin10,portc
         bclr     KnockIn,portd
         bra      soin_done
-soin:   ; non inv
-        brset    REUSE_FIDLE,outputpins,soin1
-        bclr     iasc,porta
-        bra      soin2
-soin1:  bset     iasc,porta
-soin2:  brset    REUSE_LED17,outputpins,soin3
-        bclr     sled,portc
-        bra      soin4
-soin3:  bset     sled,portc
-soin4:  brset    REUSE_LED19,outputpins,soin5
-        bclr     aled,portc
-        bra      soin6
-soin5:  bset     aled,portc
-soin6:  brclr    REUSE_LED18,outputpins,soin7
-        brclr    REUSE_LED18_2,outputpins,soin7
-        bset     wled,portc
-        bra      soin8
-soin7:  bclr     wled,portc
-soin8:
-        brclr    out3sparkd,feature2,soin9
-        bset     Output3,portd
-soin9:
-        lda	 feature8_f
-        bit      #spkeopb
-        beq      soin10
-        bset     pin10,portc
-soin10:
-       lda       feature8_f
-       bit       #spkfopb
-       beq       soin11
-       bset      KnockIn,portd
-soin11:
+;*soin:   ; non inv
+;*        brset    REUSE_FIDLE,outputpins,soin1
+;*        bclr     iasc,porta
+;*        bra      soin2
+;*soin1:  bset     iasc,porta
+;*soin2:  brset    REUSE_LED17,outputpins,soin3
+;*        bclr     sled,portc
+;*        bra      soin4
+;*soin3:  bset     sled,portc
+;*soin4:  brset    REUSE_LED19,outputpins,soin5
+;*        bclr     aled,portc
+;*        bra      soin6
+;*soin5:  bset     aled,portc
+;*soin6:  brclr    REUSE_LED18,outputpins,soin7
+;*        brclr    REUSE_LED18_2,outputpins,soin7
+;*        bset     wled,portc
+;*        bra      soin8
+;*soin7:  bclr     wled,portc
+;*soin8:
+;*        brclr    out3sparkd,feature2,soin9
+;*        bset     Output3,portd
+;*soin9:
+;*        lda	 feature8_f
+;*        bit      #spkeopb
+;*        beq      soin10
+;*        bset     pin10,portc
+;*soin10:
+;*       lda       feature8_f
+;*       bit       #spkfopb
+;*       beq       soin11
+;*       bset      KnockIn,portd
+;*soin11:
 soin_done:
 
 ;kill the dwell timers too just in case
@@ -6352,12 +6386,13 @@ dwlnwchk:
                 lda     dwelltmpHop
                 bne     dwlnwok         ; H byte>0 so dwell long enough
                 lda     dwelltmpLop
-                cmp     mindischg_f
+                cmp     mindischg_f                    ;* mindischg_f = 5T
                 bhs     dwlnwok
 dwlnwrail:
+
                 clr     dwelltmpXop     ; rail dwell delay at min discharge
                 clr     dwelltmpHop
-                lda     mindischg_f
+                lda     mindischg_f                      ;* mindischg_f = 5T
                 sta     dwelltmpLop
 dwlnwok:
 $MACROEND
@@ -6390,11 +6425,11 @@ dwlldend:
                 bne     save_dwell
 
                 lda     dwelltmpLms
-                cmp     mindischg_f	; check if less than minimum period
+                cmp     mindischg_f	; check if less than minimum period   ;* mindischg_f = 5T
                 bhi     save_dwell
 dwell_lim:				; target dwell period>available period
                 clr     dwelltmpHms
-                lda     mindischg_f
+                lda     mindischg_f                                       ;* mindischg_f = 5T
                 sta     dwelltmpLms	; minimum X x 0.1ms non-dwell time
 
 save_dwell:
@@ -6428,11 +6463,11 @@ misc_spark:
 ;
 hei7_spd:
 ;moved from Sparktime - set/clr HEI7 output
-;*        brclr   HEI7,personality,dwellornot
-;*;024a changed the logic, now transitions when fully out of crank (+1 second)
-;*; and over 400rpm
+;*        brclr   HEI7,personality,dwellornot                   ;* HE17 = 0
+;024a changed the logic, now transitions when fully out of crank (+1 second)
+; and over 400rpm
 ;*        brset   crank,engine,hei7zero
-;*;cant_crank only gets set when above cranking rpm for over a second
+;cant_crank only gets set when above cranking rpm for over a second
 ;*        brclr   cant_crank,EnhancedBits2,hei7zero
 ;*        lda     rpm
 ;*        cmp     #4T     ; hardcoded 400rpm transisition
@@ -6441,11 +6476,11 @@ hei7_spd:
 ;*        bclr    aled,portc
 ;*        bra     dwellornot
 ;*hei7zero:
-;*;If HEI and low speed set bypass to 0v
+;If HEI and low speed set bypass to 0v
 ;*        bset    aled,portc
 
 ;*dwellornot:
-;*        brclr   dwellcont,feature7,ms_dwell ; skip if not doing real dwell
+;*        brclr   dwellcont,feature7,ms_dwell ; skip if not doing real dwell   ;* dwellcont = 1
 
 ;first lookup battery correction factor from above table
         ldhx    #dwelltv
@@ -6468,10 +6503,10 @@ hei7_spd:
 
         brset   crank,engine,crankdwell
 
-        lda     dwellrun_f
+        lda     dwellrun_f                        ;* dwellrun_f = 30T
         bra     dwell_corr
 crankdwell:
-        lda     dwellcrank_f
+        lda     dwellcrank_f                      ;* dwellcrank_f = 45T
 dwell_corr:
         ldx     tmp6
         mul				; result in x:a
@@ -6551,11 +6586,11 @@ not_dwell_accel:
 ; dwell control for 1,2,3,4, rotary2 outputs
 
 
-;*                brclr   dwellcont,feature7,dwell_duty_calc
+;*                brclr   dwellcont,feature7,dwell_duty_calc     ;* dwellcont = 1
                 jmp     true_dwell_calc
 ;*dwell_duty_calc:
 ;*                brset   wspk,EnhancedBits4,wasted_dwell ; wasted spark/multi-outputs
-;*;just add on (-ddt)
+;just add on (-ddt)
 ;*                jmp     dwlprdcalc
 
 ;*wasted_dwell:
@@ -6642,7 +6677,7 @@ not_dwell_accel:
 
 ;*                jmp     dwlprdcalc
 
-cd_4dd:
+;*cd_4dd:
 ;4 periods = 4dt-1 + 4ddt
 ;4x dt-1
 ;*                lsl     dwelltmpL
@@ -6689,7 +6724,7 @@ cd_4dd:
 ;*                lda     dwelltmpX
 ;*                adc     dwelltmpXp
 ;*                sta     dwelltmpX
-;*
+
 ;2x ddt
 ;*                lsl     dwelltmpLac
 ;*                rol     dwelltmpHac
@@ -6759,11 +6794,11 @@ cd_4dd:
 ;*                rol     dwelltmpHac
 ;*                rol     dwelltmpXac
 
-;*;                bra     dwlprdcalc
+;                bra     dwlprdcalc
 
 
 ;*dwlprdcalc:
-;*;add off the accel factor (-ve)
+;add off the accel factor (-ve)
 ;*                lda     dwelltmpL
 ;*                add     dwelltmpLac
 ;*                sta     dwelltmpL
@@ -6920,9 +6955,8 @@ true_dwell_calc:
 
                 SubDwell        ; subtract dwell
 
-;*                brset   rotary2,EnhancedBits5,cd0
-;*                brset   wspk,EnhancedBits4,cd1_start
-
+;*                brset   rotary2,EnhancedBits5,cd0              ;* rotary2 = 0
+;*                brset   wspk,EnhancedBits4,cd1_start          ;* wspk = 1
 ;*cd0:
 ;*;we are either have one spark output or rotary. We dwell across a single period only.
 ;*                DwellRail     ; check if negative or less than mindischarge
@@ -6930,7 +6964,7 @@ true_dwell_calc:
 ;*                sthx    dwelldelay1
 ;*                jmp     really_done_dwell
 
-;*cd1_start:
+cd1_start:
                 ;check to see if value we _would_ store in dwelldelay1 is negative
                 ; ie. top bit set
                 lda     dwelltmpXop
@@ -6968,7 +7002,7 @@ cd_2:
 
                 SubDwell        ; subtract dwell
 
-;*                brclr   REUSE_LED18,outputpins,cd2_done    ; want 1 } spark c
+;*                brclr   REUSE_LED18,outputpins,cd2_done    ; want 1 } spark c   ;* REUSE_LED18 = 0
 ;*                brclr   REUSE_LED18_2,outputpins,cd2_done  ; want 1 }
 ;*                bra     cd2_cont
 ;*cd2_done:
@@ -6981,8 +7015,8 @@ cd_2:
                 jmp     really_done_dwell
 
 ;*cd2_cont:
-;*                ;check to see if value we _would_ store in dwelldelay2 is negative
-;*                ; ie. top bit set
+                ;check to see if value we _would_ store in dwelldelay2 is negative
+                ; ie. top bit set
 ;*                lda     dwelltmpXop
 ;*                bmi     cd_2rail   ; if pos ok, else set to zero  ?? is BPL correct?
 ;*                DwellDiv
@@ -7090,8 +7124,8 @@ cd_2:
 ;*                jmp     really_done_dwell
 
 ;*cd4_cont:
-                ;check to see if value we _would_ store in dwelldelay4 is negative
-                ; ie. top bit set
+;*                ;check to see if value we _would_ store in dwelldelay4 is negative
+;*                ; ie. top bit set
 ;*                lda     dwelltmpXop
 ;*                bmi     cd_4rail   ; if pos ok, else set to zero  ?? is BPL correct?
 ;*                DwellDiv
@@ -7144,8 +7178,8 @@ cd_2:
 ;*                jmp     really_done_dwell
 
 ;*cd5_cont:
-                ;check to see if value we _would_ store in dwelldelay4 is negative
-                ; ie. top bit set
+;*                ;check to see if value we _would_ store in dwelldelay4 is negative
+;*                ; ie. top bit set
 ;*                lda     dwelltmpXop
 ;*                bmi     cd_5rail   ; if pos ok, else set to zero  ?? is BPL correct?
 ;*                DwellDiv
@@ -7199,7 +7233,7 @@ cd_2:
 really_done_dwell:
 ;finally we've calculated everything we need to for dwell and saved it away - phew!
 
-;*                brset   rotary2,EnhancedBits5,rotary_split  ; are we doing rotary split
+;*                brset   rotary2,EnhancedBits5,rotary_split  ; are we doing rotary split  ;* rotary 2 = 0
                 jmp     misc_spark_end
 ;****************
 ; Rotary trailing split
@@ -7269,13 +7303,13 @@ really_done_dwell:
 ;*        sta     tmp18
 
 ;*        jsr     VE_STEP_4
-;       result in tmp6 - contains split degrees (0-255 = 0-89.5 deg)
+;*;       result in tmp6 - contains split degrees (0-255 = 0-89.5 deg)
 
 
 ;*split_lookup_done:
-;special values
-; 0 deg = no split, simultaneous
-; >20 deg = do not fire trailing at all
+;*;special values
+;*; 0 deg = no split, simultaneous
+;*; >20 deg = do not fire trailing at all
 ;*        lda    tmp6
 ;*        cmp    #85T ; 20deg
 ;*        bhi    trail_off  ; now set >20deg for no trailing
@@ -7285,12 +7319,12 @@ really_done_dwell:
 ;*sld2:
 ;*        cmp    #31T ; (31T = 1 deg)
 ;*        blo    trail_simult
-;        lda    dwelltmpXac
-;        beq    trail_split      ; only do split if fast enough
-;        ;at slow speeds < 537rpm no trailing
-;        ; this is a technical limitation because the trailing split would need
-;        ; re-writing using the 0.1ms spark as well. No plans to do this at the mo.
- ;*        bra    trail_split   ; changed by KC
+;*;        lda    dwelltmpXac
+;*;        beq    trail_split      ; only do split if fast enough
+;*;        ;at slow speeds < 537rpm no trailing
+;*;        ; this is a technical limitation because the trailing split would need
+;*;        ; re-writing using the 0.1ms spark as well. No plans to do this at the mo.
+;*         bra    trail_split   ; changed by KC
 
 ;*trail_off:
 ;*        mov    #85T,tmp6   ; rail calc at 20deg, disabling handled elsewhere
@@ -7304,7 +7338,7 @@ really_done_dwell:
 ;*        sta    splitdelL
 ;*        cli
 ;*        jmp    split_calc_done
-; the above gives intermittent spark? so rail at 1 deg minimum
+;*; the above gives intermittent spark? so rail at 1 deg minimum
 ;*;        mov    #31T,tmp6
 
 ;*trail_split:
@@ -7388,51 +7422,51 @@ misc_spark_end:
 ;First some Macros used within the interrupt sections
 
 $MACRO COILNEG
-        brset   REUSE_FIDLE,outputpins,dslsx
-        brset   rotary2,EnhancedBits5,rot2neg ; twin rotor code
-        brclr   TOY_DLI,outputpins,nils	; note, Toyota Multiplex only
+;*        brset   REUSE_FIDLE,outputpins,dslsx                              ;* REUSE_FIDLE = 0
+;*        brset   rotary2,EnhancedBits5,rot2neg ; twin rotor code           ;* rotary2 = 0
+;*        brclr   TOY_DLI,outputpins,nils	; note, Toyota Multiplex only   ;* rotary2 = 0
 					; NON-inverted
-        brset   coilabit,coilsel,fcnita
-        brset   coilbbit,coilsel,fcnitb
-        brset   coilcbit,coilsel,fcnitc
-fcnita:
-        bclr    coilb,portc
-        bclr    wled,portc
-        bra     dslsa
-fcnitb:
-        bset    coilb,portc
-        bclr    wled,portc
-        bra     dslsa
-fcnitc:
-        bclr    coilb,portc
-        bset    wled,portc
-        bra     dslsa
-rot2neg:
-        brset   rotaryFDign,feature1,fireFD
-        brset   coilcbit,coilsel,rot2cn
-        brset   coildbit,coilsel,rot2dn
-;either A or B both fire the single leading coil on LED17
-        bra     dslsa
-rot2cn:
-        bclr    wled,portc   ; select
-        bset    coilb,portc
-        bra     cn_end
-rot2dn:
-        bset    wled,portc
-        bset    coilb,portc
-        bra     cn_end
-nils:					; normal sparking non inverted
+;*        brset   coilabit,coilsel,fcnita
+;*        brset   coilbbit,coilsel,fcnitb
+;*        brset   coilcbit,coilsel,fcnitc
+;*fcnita:
+;*        bclr    coilb,portc
+;*        bclr    wled,portc
+;*        bra     dslsa
+;*fcnitb:
+;*        bset    coilb,portc
+;*        bclr    wled,portc
+;*        bra     dslsa
+;*fcnitc:
+;*        bclr    coilb,portc
+;*        bset    wled,portc
+;*        bra     dslsa
+;*rot2neg:
+;*        brset   rotaryFDign,feature1,fireFD
+;*        brset   coilcbit,coilsel,rot2cn
+;*        brset   coildbit,coilsel,rot2dn
+;*;either A or B both fire the single leading coil on LED17
+;*        bra     dslsa
+;*rot2cn:
+;*        bclr    wled,portc   ; select
+;*        bset    coilb,portc
+;*        bra     cn_end
+;*rot2dn:
+;*        bset    wled,portc
+;*        bset    coilb,portc
+;*        bra     cn_end
+;*nils:					; normal sparking non inverted
         brset   coilabit,coilsel,dslsa
         brset   coilbbit,coilsel,dslsb
-        brset   coilcbit,coilsel,dslsc
-        brset   coildbit,coilsel,dslsd
-        brset   coilebit,coilsel,dslse
-        brset   coilfbit,coilsel,dslsf
+;*        brset   coilcbit,coilsel,dslsc
+;*        brset   coildbit,coilsel,dslsd
+;*        brset   coilebit,coilsel,dslse
+;*        brset   coilfbit,coilsel,dslsf
         bra     cn_end			; should never get here
 
-fireFD:
-	brset	coilcbit,coilsel,dslsb
-	brset	coildbit,coilsel,dslsc
+;*fireFD:
+;*	brset	coilcbit,coilsel,dslsb
+;*	brset	coildbit,coilsel,dslsc
 
 dslsa:
         bset    coila,portc		; Set spark on
@@ -7441,75 +7475,75 @@ dslsa:
 dslsb:
         bset    coilb,portc		; Set spark on
         bra     cn_end
-dslsc:
-        bset    wled,portc		; Set spark on
-        bra     cn_end
-dslsd:
-        bset    output3,portd		; Set spark on
-        bra     cn_end
-dslse:
-        bset    pin10,portc		; Set spark on
-        bra     cn_end
-dslsf:
-        bset    knockin,portd		; Set spark on
-        bra     cn_end
-dslsx:
-        bset    iasc,porta
+;*dslsc:
+;*        bset    wled,portc		; Set spark on
+;*        bra     cn_end
+;*dslsd:
+;*        bset    output3,portd		; Set spark on
+;*        bra     cn_end
+;*dslse:
+;*        bset    pin10,portc		; Set spark on
+;*        bra     cn_end
+;*dslsf:
+;*        bset    knockin,portd		; Set spark on
+;*        bra     cn_end
+;*dslsx:
+;*        bset    iasc,porta
 cn_end:
 $MACROEND
 
 ***************************************************************************
 
 $MACRO COILPOS
-        brset   REUSE_FIDLE,outputpins,ilsox
-        brset   rotary2,EnhancedBits5,rot2pos
+;*        brset   REUSE_FIDLE,outputpins,ilsox              ;* REUSE_FIDLE = 0
+;*        brset   rotary2,EnhancedBits5,rot2pos             ;* rotary2 = 0
 					; note no Toyota, because
 					; never inverted - ??? is this right
         brset   coilabit,coilsel,ilsoa
         brset   coilbbit,coilsel,ilsob
-        brset   coilcbit,coilsel,ilsoc
-        brset   coildbit,coilsel,ilsod
-        brset   coilebit,coilsel,ilsoe
-        brset   coilfbit,coilsel,ilsof
+;*        brset   coilcbit,coilsel,ilsoc
+;*        brset   coildbit,coilsel,ilsod
+;*        brset   coilebit,coilsel,ilsoe
+;*        brset   coilfbit,coilsel,ilsof
         bra     fc_end			; should never get here
-rot2pos:
-        brset   rotaryFDign,feature1,chargeFD
-        brset   coilcbit,coilsel,rot2cp
-        brset   coildbit,coilsel,rot2dp
+;*rot2pos:
+;*        brset   rotaryFDign,feature1,chargeFD
+;*        brset   coilcbit,coilsel,rot2cp
+;*        brset   coildbit,coilsel,rot2dp
 ;either A or B both fire the single leading coil on LED17
-        bra     ilsoa
-rot2cp:
-;        bclr    wled,portc   ; select. Commented by KC, b/c there's no
+;*        bra     ilsoa
+;*rot2cp:
+;*;        bclr    wled,portc   ; select. Commented by KC, b/c there's no
 			      ; rotary inverted... if using stock hardware.
-        bclr    coilb,portc
-        bra     fc_end
-rot2dp:
-;        bset    wled,portc
-        bclr    coilb,portc
-        bra     fc_end
-chargeFD:
-	brset	coilcbit,coilsel,ilsoc
-	brset	coildbit,coilsel,ilsob
+;*        bclr    coilb,portc
+;*        bra     fc_end
+;*rot2dp:
+;*;        bset    wled,portc
+;*        bclr    coilb,portc
+;*        bra     fc_end
+;*chargeFD:
+;*	brset	coilcbit,coilsel,ilsoc
+;*	brset	coildbit,coilsel,ilsob
 ilsoa:
         bclr    coila,portc
         bra     fc_end
 ilsob:
         bclr    coilb,portc
         bra     fc_end
-ilsoc:
-        bclr    wled,portc
-        bra     fc_end
-ilsod:
-        bclr    output3,portd
-        bra     fc_end
-ilsoe:
-        bclr    pin10,portc
-        bra     fc_end
-ilsof:
-        bclr    knockin,portd
-        bra     fc_end
-ilsox:
-        bclr    iasc,porta
+;*ilsoc:
+;*        bclr    wled,portc
+;*        bra     fc_end
+;*ilsod:
+;*        bclr    output3,portd
+;*        bra     fc_end
+;*ilsoe:
+;*        bclr    pin10,portc
+;*        bra     fc_end
+;*ilsof:
+;*        bclr    knockin,portd
+;*        bra     fc_end
+;*ilsox:
+;*        bclr    iasc,porta
 fc_end:
 $MACROEND
 
@@ -7536,7 +7570,7 @@ $MACRO CalcDwellspk
 ; outputs there are - 1,2,3,4,5,6
 ;022g - macro is now used to apply dwelldelay value calculated in main loop.
 ; macro only used after spark when mainloop will??? have had time to calc since trigger
-;*                brset   wspk,EnhancedBits4,wastedwell
+;*                brset   wspk,EnhancedBits4,wastedwell                     ;* wspk = 1
 ;for single output dwell always use dwelldelay1
 ;*                ldhx    dwelldelay1
 ;*                brset   coilabit,coilsel,dd_a
@@ -7564,18 +7598,19 @@ jwdwell2op:     jmp     wdwell2op
 ;one section each for 2,3,4,5,6 outputs
 ;nothing needed for rotary, it's not considered wasted spark
 ;*                lda     feature8_f
-;*                bit     #spkfopb
+;*                bit     #spkfopb                                  ;* spkfopb = 0
 ;*                bne     jwdwell6op
-;*                bit     #spkeopb
+;*                bit     #spkeopb                                   ;* spkeopb = 0
 ;*                bne     jwdwell5op
 
-;*                brset   out3sparkd,feature2,jwdwell4op ; if 4 o/ps
+;*                brset   out3sparkd,feature2,jwdwell4op ; if 4 o/ps  ;* out3sparkd = 0
 ;check if 3rd spark output in use
 ;no need to check for 2nd output, wouldn't have got here otherwise (wspk above)
-;*                brclr   REUSE_LED18,outputpins,jwdwell2op    ; want 1 } spark c
+;*                brclr   REUSE_LED18,outputpins,jwdwell2op    ; want 1 } spark c   ;* REUSE_LED18 = 0
 ;*                brclr   REUSE_LED18_2,outputpins,jwdwell2op  ; want 1 }
+;*
 ;*wdwell3op:
-;first off always store a 360deg dwell delay
+;*;first off always store a 360deg dwell delay
 ;*                ldhx    dwelldelay3    ; precalculated to rail at mindischg
 ;*                brset   coilabit,coilsel,wd3a360
 ;*                brset   coilbbit,coilsel,wd3b360
@@ -7587,13 +7622,13 @@ jwdwell2op:     jmp     wdwell2op
 ;*wd3c360:        sthx    SparkOnLeftch
 ;*wd3end360:
 
-;we've now set the 360deg wait, see if we can delay off previous spark (120deg)
+;*;we've now set the 360deg wait, see if we can delay off previous spark (120deg)
 ;*                lda     dwelldelay1
 ;*                bne     wd3ok120
 ;*                lda     dwelldelay1+1
 ;*                cmp     #2
 ;*                blo     wd3skip120   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd3ok120:
 ;*                ldhx    dwelldelay1
 ;*                brset   coilabit,coilsel,wd3a120
@@ -7608,7 +7643,7 @@ jwdwell2op:     jmp     wdwell2op
 ;*;;;;;;;;;;      jmp     dd_end ; always apply all three
 
 ;*wd3skip120:
-;not enough time in 120deg period, see if 240deg will work
+;*;not enough time in 120deg period, see if 240deg will work
 ;*                lda     dwelldelay2
 ;*                bne     wd3ok240
 ;*                lda     dwelldelay2+1
@@ -7638,9 +7673,9 @@ wd2a360:        sthx    SparkOnLeftah
 wd2b360:        sthx    SparkOnLeftbh
 wd2end360:
 ;consider oddfire, do not delay from previous spark
-;*                lda     SparkConfig1_f
-;*                bit     #M_SC1oddfire
-;*                bne     wd2skip
+                lda     SparkConfig1_f
+                bit     #M_SC1oddfire                           ;* M_SC1oddfire = 0
+                bne     wd2skip
 
 ;we've now set the 360deg wait, see if we can delay off previous spark (180deg)
                 lda     dwelldelay1
@@ -7663,7 +7698,7 @@ wd2skip:        jmp     dd_end
 ;****************
 
 ;*wdwell4op:
-;first off always store a 360deg dwell delay
+;*;first off always store a 360deg dwell delay
 ;*                ldhx    dwelldelay4    ; precalculated to rail at mindischg
 ;*                brset   coilabit,coilsel,wd4a360
 ;*                brset   coilbbit,coilsel,wd4b360
@@ -7678,18 +7713,18 @@ wd2skip:        jmp     dd_end
 ;*wd4d360:        sthx    SparkOnLeftdh
 ;*wd4end360:
 
-;consider oddfire, do not delay from previous spark
+;*;consider oddfire, do not delay from previous spark
 ;*                lda     sparkconfig1_f
 ;*                bit     #M_SC1oddfire
 ;*                bne     wd4skip90
 
-;we've now set the 360deg wait, see if we can delay off previous spark (90deg)
+;*;we've now set the 360deg wait, see if we can delay off previous spark (90deg)
 ;*                lda     dwelldelay1
 ;*                bne     wd4ok90 ; if non zero then long delay so ok
 ;*                lda     dwelldelay1+1
 ;*                cmp     #2
 ;*                blo     wd4skip90   ; check if more than 0.2ms
-                ; if less, then dwell might get missed
+;*                ; if less, then dwell might get missed
 ;*wd4ok90:
 ;*                ldhx    dwelldelay1
 ;*                brset   coilabit,coilsel,wd4a90
@@ -7705,17 +7740,17 @@ wd2skip:        jmp     dd_end
 ;*wd4d90:        sthx    SparkOnLeftah
 ;*wd4end90:
 ;*;;;       bra     dd_end
-;;note! may want to change this so that intermediate periods are set too so that there
-;is a smoother transition from 90deg dwell to 180deg etc.
+;*;;note! may want to change this so that intermediate periods are set too so that there
+;*;is a smoother transition from 90deg dwell to 180deg etc.
 
 ;*wd4skip90:
-;not enough time in 90deg period, see if 180deg will work
+;*;not enough time in 90deg period, see if 180deg will work
 ;*                lda     dwelldelay2
 ;*                bne     wd4ok180
 ;*                lda     dwelldelay2+1
 ;*                cmp     #2
 ;*                blo     wd4skip180   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd4ok180:
 ;*                ldhx    dwelldelay2
 ;*                brset   coilabit,coilsel,wd4a180
@@ -7731,20 +7766,20 @@ wd2skip:        jmp     dd_end
 ;*wd4d180:        sthx    SparkOnLeftbh
 ;*wd4end180:
 ;*;;      bra     dd_end
-
+;*
 ;*wd4skip180:
 ;*;consider oddfire, do not delay from previous spark
 ;*                lda     sparkconfig1_f
 ;*                bit     #M_SC1oddfire
 ;*                bne     wd4end270
 
-;not enough time in 180deg period, see if 270deg will work
+;*;not enough time in 180deg period, see if 270deg will work
 ;*                lda     dwelldelay3
 ;*                bne     wd4ok270
 ;*                lda     dwelldelay3+1
 ;*                cmp     #2
 ;*                blo     wd4end270   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd4ok270:
 ;*                ldhx    dwelldelay3
 ;*                brset   coilabit,coilsel,wd4a270
@@ -7782,13 +7817,13 @@ wd2skip:        jmp     dd_end
 ;*                bra     wd5end360
 ;*wd5e360:        sthx    SparkOnLefteh
 ;*wd5end360:
-;we've now set the 360deg wait, see if we can delay off previous spark (72deg)
+;*;we've now set the 360deg wait, see if we can delay off previous spark (72deg)
 ;*                lda     dwelldelay1
 ;*                bne     wd5ok72 ; if non zero then long delay so ok
 ;*                lda     dwelldelay1+1
 ;*                cmp     #2
 ;*                blo     wd5skip72   ; check if more than 0.2ms
-                ; if less, then dwell might get missed
+;*                ; if less, then dwell might get missed
 ;*wd5ok72:
 ;*                ldhx    dwelldelay1
 ;*                brset   coilabit,coilsel,wd5a72
@@ -7807,8 +7842,8 @@ wd2skip:        jmp     dd_end
 ;*wd5e72:         sthx    SparkOnLeftah
 ;*wd5end72:
 ;*;;;       bra     dd_end
-;;note! may want to change this so that intermediate periods are set too so that there
-;is a smoother transition from 72deg dwell to 144deg etc.
+;*;;note! may want to change this so that intermediate periods are set too so that there
+;*;is a smoother transition from 72deg dwell to 144deg etc.
 
 ;*wd5skip72:
 
@@ -7838,13 +7873,13 @@ wd2skip:        jmp     dd_end
 ;*;;      bra     dd_end
 
 ;*wd5skip144:
-;not enough time in 144deg period, see if 216deg will work
+;*;not enough time in 144deg period, see if 216deg will work
 ;*                lda     dwelldelay3
 ;*                bne     wd5ok216
 ;*                lda     dwelldelay3+1
 ;*                cmp     #2
 ;*                blo     wd5skip216   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd5ok216:
 ;*                ldhx    dwelldelay3
 ;*                brset   coilabit,coilsel,wd5a216
@@ -7865,13 +7900,13 @@ wd2skip:        jmp     dd_end
 ;*;      bra     dd_end
 
 ;*wd5skip216:
-;not enough time in 216deg period, see if 288deg will work
+;*;not enough time in 216deg period, see if 288deg will work
 ;*                lda     dwelldelay4
 ;*                bne     wd5ok288
 ;*                lda     dwelldelay4+1
 ;*                cmp     #2
 ;*                blo     wd5skip288   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd5ok288:
 ;*                ldhx    dwelldelay4
 ;*                brset   coilabit,coilsel,wd5a288
@@ -7916,18 +7951,18 @@ wd2skip:        jmp     dd_end
 ;*                bra     wd6end360
 ;*wd6f360:        sthx    SparkOnLeftfh
 ;*wd6end360:
-;consider oddfire, do not delay from previous spark
+;*;consider oddfire, do not delay from previous spark
 ;*                lda     sparkconfig1_f
 ;*                bit     #M_SC1oddfire
 ;*                bne     wd6skip60
 
-;we've now set the 360deg wait, see if we can delay off previous spark (60deg)
+;*;we've now set the 360deg wait, see if we can delay off previous spark (60deg)
 ;*                lda     dwelldelay1
 ;*                bne     wd6ok60 ; if non zero then long delay so ok
 ;*                lda     dwelldelay1+1
 ;*                cmp     #5
 ;*                blo     wd6skip60   ; check if more than 0.2ms
-                ; if less, then dwell might get missed
+;*                ; if less, then dwell might get missed
 ;*wd6ok60:
 ;*                ldhx    dwelldelay1
 ;*                brset   coilabit,coilsel,wd6a60
@@ -7949,11 +7984,11 @@ wd2skip:        jmp     dd_end
 ;*wd6f60:         sthx    SparkOnLeftah
 ;*wd6end60:
 ;*;;;       bra     dd_end
-;;note! may want to change this so that intermediate periods are set too so that there
-;is a smoother transition from 60deg dwell to 120deg etc.
+;*;;note! may want to change this so that intermediate periods are set too so that there
+;*;is a smoother transition from 60deg dwell to 120deg etc.
 
 ;*wd6skip60:
-;not enough time in 60deg period, see if 120deg will work
+;*;not enough time in 60deg period, see if 120deg will work
 ;*                lda     dwelldelay2
 ;*                bne     wd6ok120
 ;*                lda     dwelldelay2+1
@@ -7983,18 +8018,18 @@ wd2skip:        jmp     dd_end
 ;*;;      bra     dd_end
 
 ;*wd6skip120:
-;consider oddfire, do not delay from previous spark
+;*;consider oddfire, do not delay from previous spark
 ;*                lda     sparkconfig1_f
 ;*                bit     #M_SC1oddfire
 ;*                bne     wd6skip180
 
-;not enough time in 120deg period, see if 180deg will work
+;*;not enough time in 120deg period, see if 180deg will work
 ;*                lda     dwelldelay3
 ;*                bne     wd6ok180
 ;*                lda     dwelldelay3+1
 ;*                cmp     #5
 ;*                blo     wd6skip180   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd6ok180:
 ;*                ldhx    dwelldelay3
 ;*                brset   coilabit,coilsel,wd6a180
@@ -8018,13 +8053,13 @@ wd2skip:        jmp     dd_end
 ;*                bra     dd_end
 
 ;*wd6skip180:
-;not enough time in 180deg period, see if 240deg will work
+;*;not enough time in 180deg period, see if 240deg will work
 ;*                lda     dwelldelay4
 ;*                bne     wd6ok240
 ;*                lda     dwelldelay4+1
 ;*                cmp     #5
 ;*                blo     wd6skip240   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd6ok240:
 ;*                ldhx    dwelldelay4
 ;*                brset   coilabit,coilsel,wd6a240
@@ -8048,18 +8083,18 @@ wd2skip:        jmp     dd_end
 ;*;                jmp     dd_end
 
 ;*wd6skip240:
-;consider oddfire, do not delay from previous spark
+;*;consider oddfire, do not delay from previous spark
 ;*                lda     sparkconfig1_f
 ;*                bit     #M_SC1oddfire
 ;*                bne     wd6skip300
 
-;not enough time in 240deg period, see if 300deg will work
+;*;not enough time in 240deg period, see if 300deg will work
 ;*                lda     dwelldelay5
 ;*                bne     wd6ok300
 ;*                lda     dwelldelay5+1
 ;*                cmp     #5
 ;*                blo     wd6skip300   ; check if more than 0.2ms
-                ; if less then dwell might get missed
+;*                ; if less then dwell might get missed
 ;*wd6ok300:
 ;*                ldhx    dwelldelay5
 ;*                brset   coilabit,coilsel,wd6a300
@@ -8103,10 +8138,10 @@ $MACROEND
 ;*        cphx    #0
 ;*        bne     go_inj_fire2		; skip if non-zero
 
-; start 2nd SAW here and set timer to turn it off
+;*; start 2nd SAW here and set timer to turn it off
 ;*        clr     coilsel
 ;*        bset    coilbbit,coilsel	; only support 2nd spark output
-        ; assume that other outputs cannot get set
+;*        ; assume that other outputs cannot get set
 ;*        bset    sparkon,revlimbits	; note that spark is on
 
 ;*        brset   invspk,EnhancedBits4,InvSparkOn2
@@ -8133,7 +8168,7 @@ $MACROEND
 ;*        bit     #multisparkb
 ;*        beq     SAW_COUNTER2
 ;*;        brclr   multispark,feature4,SAW_COUNTER2
-; at crank we always send 2048us as calibration and multi-spark init
+;*; at crank we always send 2048us as calibration and multi-spark init
 ;*        lda     #$00
 ;*        sta     sawl
 ;*        lda     #$08
@@ -8163,7 +8198,11 @@ $MACROEND
 ;some timerroll equates - local variables that can only be used with irqs blocked
 ;we'll start using itmp00 - itmp0f in here
 
-TIMERROLL:
+;*****************************************************************************
+
+TIMERROLL: ;* Timer Rollover - Occurs every 1/10 of a millisecond - main timing clock
+
+;*****************************************************************************
 
                  bclr    checkbit,EnhancedBits5
                  pshh			; Stack h
@@ -8206,7 +8245,7 @@ TIMER_DONE:
 
 ; Added for boost control - Hope it doesnt screw up the timer -
 ; James will kill me if it does
-;*        brclr    BoostControl,feature2,bcActDone
+;*        brclr    BoostControl,feature2,bcActDone                 ;* BoostControl = 0
 ;*        inc      mmsDiv			; Counts up to bcFreqDiv.
 ;*        lda      mmsDiv			; Counter at multiples of 0.1 ms
 ;*        cmp      bcFreqDiv_f		; 1=39.1 Hz, 2=19.5, 3=13.0 and so on.
@@ -8216,10 +8255,10 @@ TIMER_DONE:
 ;*        lda      bcActClock
 ;*bcActDone:
 
-;*        brset   TFI,personality,j_tfi_spk
-;*        brset   EDIS,personality,go_inj_fire3
-;*        brset   MSNEON,personality,neon_irq
-;*        brset   WHEEL,personality,wheel_irq
+;*        brset   TFI,personality,j_tfi_spk          ;* TFI = 0
+;*        brset   EDIS,personality,go_inj_fire3      ;* EDIS = 0
+;*        brset   MSNEON,personality,neon_irq        ;* MSNEON = 0
+;*        brset   WHEEL,personality,wheel_irq        ;* WHEEL = 1
 
 ;*        lda     personality
 ;*        bne     no_wd_trig              ; any other spark modes skip over 2nd irq bits
@@ -8237,8 +8276,8 @@ TIMER_DONE:
 ;*        jmp     tfi_spk			; branch to next chunk
 
 ;*neon_irq:
-; Neon crank decoding
-; See if we have seen a rising IRQ edge and save it
+;*; Neon crank decoding
+;*; See if we have seen a rising IRQ edge and save it
 
 ;*        bil     no_wd_trig
 
@@ -8253,7 +8292,7 @@ TIMER_DONE:
 
 ;*wheel_irq:
 ;more bloat... check for second "reset" spark input
-;*      brclr   wd_2trig,feature1,no_wd_trig
+;*      brclr   wd_2trig,feature1,no_wd_trig                ;* wd_2trig = 0
 
 ;*      lda     dtmode_f
 ;*      bit     #trig2risefallb
@@ -8283,7 +8322,7 @@ TIMER_DONE:
 ;*      bra     no_wd_trig
 ;*wd_fall:
 ;*      brset   pin11,portc,no_wd_trig
-;we've found a falling edge of pin11, so clear wheelcount (tooth zero) and set rise bit
+;*;we've found a falling edge of pin11, so clear wheelcount (tooth zero) and set rise bit
 ;*      bclr    rise,sparkbits           ; this bit used to monitor the edge of the input
 ;*      bra     wd_2_flag
 
@@ -8302,7 +8341,7 @@ TIMER_DONE:
 ;*wd_2_flag:
 ;*      bset    trigger2,EnhancedBits6   ; flag the trigger
 
-no_wd_trig:
+;*no_wd_trig:
 
 ; now with multi-dwell check them all each time (how much delay to
 ; 0.1ms routine?) this routine is flawed but only slightly - when one
@@ -8314,7 +8353,7 @@ no_wd_trig:
         mov     coilsel,SparkCarry; temporary
 
 	brclr	indwell,EnhancedBits4,sin_a
-;*	brset	rotary2,EnhancedBits5,clr_a_b
+;*	brset	rotary2,EnhancedBits5,clr_a_b                 ;* rotary2 = 0
 
 sin_a:
         ldhx    SparkOnLeftah
@@ -8328,11 +8367,13 @@ sin_a:
         bra     lowspdspk
 sin_b:
         ldhx    SparkOnLeftbh
-        beq     sin_c
+;*        beq     sin_c
+        beq     j_CSL
         aix     #-1			; is it time to start charging
         sthx    SparkOnLeftbh
         cphx    #0
-        bne     sin_c
+;*        bne     sin_c
+        bne     j_CSL
         clr     coilsel
         bset    coilbbit,coilsel
         bra     lowspdspk
@@ -8340,9 +8381,9 @@ sin_b:
 ;*	ldhx	#0
 ;*	sthx	SparkOnLeftah
 ;*	sthx	SparkOnLeftbh
-sin_c:
-        ldhx    SparkOnLeftch
-        beq     sin_d
+;*sin_c:
+;*        ldhx    SparkOnLeftch
+;*        beq     sin_d
 ;*        aix     #-1			; is it time to start charging
 ;*        sthx    SparkOnLeftch
 ;*        cphx    #0
@@ -8350,9 +8391,9 @@ sin_c:
 ;*        clr     coilsel
 ;*        bset    coilcbit,coilsel
 ;*        bra     lowspdspk
-sin_d:
-        ldhx    SparkOnLeftdh
-        beq     sin_e
+;*sin_d:
+;*        ldhx    SparkOnLeftdh
+;*        beq     sin_e
 ;*        aix     #-1			; is it time to start charging
 ;*        sthx    SparkOnLeftdh
 ;*        cphx    #0
@@ -8361,9 +8402,9 @@ sin_d:
 ;*        bset    coildbit,coilsel
 ;*        bra     lowspdspk
 
-sin_e:
-        ldhx    SparkOnLefteh
-        beq     sin_f
+;*sin_e:
+;*        ldhx    SparkOnLefteh
+;*        beq     sin_f
 ;*        aix     #-1			; is it time to start charging
 ;*        sthx    SparkOnLefteh
 ;*        cphx    #0
@@ -8371,9 +8412,9 @@ sin_e:
 ;*        clr     coilsel
 ;*        bset    coilebit,coilsel
 ;*        bra     lowspdspk
-sin_f:
-        ldhx    SparkOnLeftfh
-        beq     j_CSL
+;*sin_f:
+;*        ldhx    SparkOnLeftfh
+;*        beq     j_CSL
 ;*        aix     #-1			; is it time to start charging
 ;*        sthx    SparkOnLeftfh
 ;*        cphx    #0
@@ -8391,7 +8432,7 @@ go_inj_fire:
 
 
 lowspdspk:
-;*                brclr   rotary2,EnhancedBits5,chkindwell
+;*                brclr   rotary2,EnhancedBits5,chkindwell   ;* rotary2 = 0
 ;*                brset   coilabit,coilsel,chkindwell
 ;*                brset   coilbbit,coilsel,chkindwell
 ;*                lda     splitdelH
@@ -8410,7 +8451,7 @@ dodwell:
 ;this used to be in SPARKTIME but could have overheated ignitors
         lda     SparkCutCnt	; Check Spark Counter
         inca
-        cmp     SparkCutBase_f	; How many sparks to count to
+        cmp     SparkCutBase_f	; How many sparks to count to     ;* SparkCutBase_f = 6T
         blo     Dont_ResetCnt
         lda     #01T
 Dont_ResetCnt:
@@ -8418,8 +8459,9 @@ Dont_ResetCnt:
         brset   sparkCut,RevLimBits,blssd	; If in spark cut
 					; mode jump past spark
 
-        brset   invspk,EnhancedBits4,lsspk_inv ; check if noninv or inv spark
-        COILPOS				; charge coil for non-inverted
+;*        brset   invspk,EnhancedBits4,lsspk_inv ; check if noninv or inv spark    ;* invspk = 1
+;*        COILPOS				; charge coil for non-inverted
+        bra     lsspk_inv       ;* RJH 7/25/23
 blssd:
         bra     lsspk_done
 lsspk_inv:
@@ -8442,10 +8484,10 @@ CHECK_SPARK_LATE:
         brset   cant_crank,EnhancedBits2,timebased
 
 ;*        lda     SparkConfig1_f		; check if noninv or inv spark
-;*        bit     #M_SC1TimCrnk		; Check if spark on time or IRQ
+;*        bit     #M_SC1TimCrnk		; Check if spark on time or IRQ    ;* M_SC1TimCrnk = 0
 					; return (SparkConfig1 already in A)
 ;*        beq     IRQ_SPARK
-          bra     IRQ_SPARK
+		bra     IRQ_SPARK   ;* RJH 7/25/23
 
 timebased:
         ;Check if time for spark
@@ -8456,20 +8498,22 @@ timebased:
         cmp     SparkDelayL
         bne     jINJ_FIRE_CTL
         bra     ChkHold
-
+;**
 jINJ_FIRE_CTL:				; convenient place to branch to
         jmp     INJ_FIRE_CTL
 ;**
 
 IRQ_SPARK:
-;*        brset   MSNEON,personality,irq_spark_neon
-;*        brset   WHEEL,personality,irq_spark_neon
+;*        brset   MSNEON,personality,irq_spark_neon                           ;* MSNEON = 0
+;*        brset   WHEEL,personality,irq_spark_neon                            ;* WHEEL = 1
+        bra     irq_spark_neon   ;* RJH 7/25/23
 ;*        bil     jINJ_FIRE_CTL		; IRQ still low? then skip
 
 ChkHold:
-;*        bclr    sparktrigg,sparkbits	; No more sparks for this IRQ
-;*        brset   MSNEON,personality,DoSparkLSpeed
-;*        brset   WHEEL,personality,DoSparkLSpeed	; no hold off on wheel decoder
+        bclr    sparktrigg,sparkbits	; No more sparks for this IRQ
+;*        brset   MSNEON,personality,DoSparkLSpeed                                  ;* MSNEON = 0
+;*        brset   WHEEL,personality,DoSparkLSpeed	; no hold off on wheel decoder  ;* WHEEL = 1
+        bra     DoSparkLSpeed     ;* RJH 7/25/23
 ;*        lda     wheelcount		; (HoldSpark)
 					; Check if spark is held (after
 					; stall and restart)
@@ -8480,50 +8524,50 @@ ChkHold:
 
 ; This will not work with wheel decoder, need to use a flag
 ;        Treat end of third pulse as trigger return
-;*irq_spark_neon:
-;*        brclr   trigret,SparkBits,jINJ_FIRE_CTL
-;*        bclr    trigret,SparkBits	; clear it now
-;*        bclr    sparktrigg,sparkbits	; No more sparks for this IRQ
+irq_spark_neon:
+        brclr   trigret,SparkBits,jINJ_FIRE_CTL
+        bclr    trigret,SparkBits	; clear it now
+        bclr    sparktrigg,sparkbits	; No more sparks for this IRQ
 
 DoSparkLSpeed:
         bset    sparkon,revlimbits	; spark now on
 
-        brset   invspk,EnhancedBits4,dosls_inv
-        COILNEG				; macro = fire coil for non-inverted
-        bra     dosls_done
-dosls_inv:
+;*        brset   invspk,EnhancedBits4,dosls_inv                            ;* invspk = 1
+;*        COILNEG				; macro = fire coil for non-inverted
+;*        bra     dosls_done
+;*dosls_inv:
         COILPOS				; macro = fire coil for inverted
 dosls_done:
 ; changed - low speed and dwell control, schedule dwell at same time
 ; as we schedule the spark to maintain a consistent dwell
 ;
-;*        brset   dwellcont,feature7,b_INJFC2	; don't schedule chg time
-					; here (low speed)
+;*        brset   dwellcont,feature7,b_INJFC2	; don't schedule chg time     ;* dwellcont = 1
+;*					; here (low speed)
 ;*        brset   min_dwell,feature2,b_INJFC2	; don't schedule chg time here
 ;*        bra     dosls_cd
-;*b_INJFC2:
+b_INJFC2:
         jmp     INJ_FIRE_CTL
-dosls_fd:
+;*dosls_fd:
 ; if doing dwell control, figure out when to schedule dwell.
-        brclr   crank,engine,dosls_cd
+;*        brclr   crank,engine,dosls_cd
 ;*        brset   min_dwell,feature2,b_INJFC2	; don't schedule chg time here
 ; in dwell mode min_dwell means turn coil to charge at trigger point,
 ; but this can give a very long dwell period which won't be good for IGBTs
 ;
-dosls_cd:
-        sei
-        CalcDwellspk			; Calculate spark on time
-        cli
-b_INJFC:
-        bra     INJ_FIRE_CTL
+;*dosls_cd:
+;*        sei
+;*        CalcDwellspk			; Calculate spark on time
+;*        cli
+;*b_INJFC:
+;*        bra     INJ_FIRE_CTL
 
 ;fresh section for TFI spark to keep things clearer
 ;*TFI_spk:
         ;if tfi & sparkon & low speed & irq high then follow
 ; ??? next line irrelevant ??? commented 027b 20th Nov 05
-;*;        brclr   sparkon,revlimbits,INJ_FIRE_CTL	; if output not active then
+;        brclr   sparkon,revlimbits,INJ_FIRE_CTL	; if output not active then
 					; skip
-;*;        brclr   sparktrigg,sparkbits,INJ_FIRE_CTL	; if sparktrigg???
+;        brclr   sparktrigg,sparkbits,INJ_FIRE_CTL	; if sparktrigg???
 					; not active then skip
 ;*        brclr   SparkLSpeed,Sparkbits,tfi_fast	; if not slow then do high
 					; speed calc
@@ -8584,7 +8628,7 @@ NEW_SQUIRT1:
 					; now current operation)
         bset     inj1,squirt
         clr      pwrun1
-;*        brset    REUSE_LED17,outputpins,nsq1
+;*        brset    REUSE_LED17,outputpins,nsq1                       ;* REUSE_LED17 = 1
 ;*        bset     sled,portc		; squrt LED is ON
 nsq1:
         mov      #$00,T1CH0H
@@ -8604,12 +8648,12 @@ NEW_SQUIRT2:
 					; current operation)
         bset     inj2,squirt
         clr      pwrun2
-;*        brset    REUSE_LED17,outputpins,nsq2
-;*        bset     sled,portc		; squrt LED is ON
-;*nsq2:
+;*        brset    REUSE_LED17,outputpins,nsq2                        ;* REUSE_LED17 = 1
+;*        bset     sled,portc		; squirt LED is ON
+nsq2:
         mov      #$00,T1CH1H
 ;*        lda      DTmode_f
-;*        bit      #alt_i2t2
+;*        bit      #alt_i2t2                                            ;* alt_i2t2 = 0
 ;*        beq      nsq2single
 
 ;*        lda      INJPWM_f2
@@ -8624,12 +8668,13 @@ nsq2cont:
 					; (inverted drive)
 
 ;*         lda     feature3_f
-;*         bit     #WaterInjb
+;*         bit     #WaterInjb                                           ;* WaterInjb = 0
 ;*         beq     INJF2
+	  bra	     INJF2     ;* RJH 7/25/23
 ;*;        brclr    WaterInj,feature3,INJF2
 ;*        brset    water,porta,inject_water	; If water needed go to
 					; inject water
-	  bra	     INJF2
+
 ;*inject_water:
 ;*       brset  Nitrous,feature1,INJF2	; If NOS Selected dont turn on
 					; water pulsed output
@@ -8683,14 +8728,14 @@ CHK_DONE_2:
         jmp      CHECK_RPM
 CKDN2:
 ;*        lda      DTmode_f
-;*        bit      #alt_i2t2
+;*        bit      #alt_i2t2                                           ;* alt_i2t2 = 0
 ;*        beq      ckd2single		; dt=0
 
 ;*        lda      pwrun2			; use PWM settings from second table
 ;*        cmp      INJPWMT_f2
 ;*        beq      PWM_LIMIT_2
 ;*	bra	 inj2done
-ckd2single:
+;*ckd2single:
         lda      pwrun2			; use PWM settings from first table
         cmp      INJPWMT_f1
         beq      PWM_LIMIT_2
@@ -8705,12 +8750,12 @@ OFF_INJ_2:
         bset     inject2,portd		; ^* * * Turn Off Injector #2
 					; (inverted drive)
 ;*         lda     feature3_f
-;*         bit     #WaterInjb
+;*         bit     #WaterInjb                                             ;* WaterInjb = 0
 ;*         beq     Dont_Clr_Water2
 ;*;        brclr    WaterInj,feature3,Dont_Clr_Water2	; if not using water
 					; then skip
 ;*        bclr     water2,porta		; Turn off water injection pulse
-Dont_Clr_Water2:
+;*Dont_Clr_Water2:
         mov      #T1Timerstop,T1SC
         mov      #t1scx_NO_PWM,T1SC1
         mov      #Timergo_NO_INT,T1SC
@@ -8734,12 +8779,12 @@ idleActuator:
 					; shut (rmd changed from off to on)
         brclr    running,engine,idleActOff	; if not running then close it
         lda      feature13_f 	; skip if on/off mode
-        bit      #pwmidleb
+        bit      #pwmidleb                                  ;* pwmidleb = 1
         beq      idleActCheck
 
         inc      idleActClock		; Adjust idle PWM count
         lda      idleActClock
-        cmp      idlefreq_f
+        cmp      idlefreq_f                               ;* idlefreq_f = 100T
         bne      idleActCheck
         clr      idleActClock
 
@@ -8747,7 +8792,7 @@ idleActCheck:
         lda      idleDC
         cmp      #0T
         beq      idleActOff
-        cmp      idlefreq_f  ; #255T KG
+        cmp      idlefreq_f                                ;* idlefreq_f = 100T
         beq      idleActOn
         cmp      idleActClock
         bls      idleActOff
@@ -8772,7 +8817,7 @@ idleActDone:
 **  can invert the output to reverse the sense
 *****************************************************************************
 
-;*        brclr  BoostControl,feature2,doneBoostControl
+;*        brclr  BoostControl,feature2,doneBoostControl    ;* BoostControl = 0
 ;*doBoostControl:
 ;*        lda     bcDC
 ;*        beq     boostOff		; Turn it off, if duty cycle is zero.
@@ -8784,7 +8829,7 @@ idleActDone:
 ;*        bit     #BoostDirb
 ;*        bne     bcClrout
 ;*;        brset   BoostDir,feature6,bcClrout	; Change dir for high
-					; pulsewidth reduce boost
+;*					; pulsewidth reduce boost
 ;*        bra     bcSetout
 ;*boostOff:
 ;*        lda     feature6_f
@@ -8809,7 +8854,7 @@ CHECK_RPM:
 					; right now
         brset    firing1,squirt,CHK_RE_ENABLE
         brset    firing2,squirt,CHK_RE_ENABLE
-;*        brset    REUSE_LED17,outputpins,CHK_RE_ENABLE
+;*        brset    REUSE_LED17,outputpins,CHK_RE_ENABLE   ;* REUSE_LED17 = 1
 ;*        bclr     sled,portc		; squrt LED is OFF - nothing
 					; is injecting
 
@@ -8834,10 +8879,10 @@ RPMLOWBYTECHK:
 
 REARM_IRQ:
 ; Also do tacho output in here to give 50% output duty
-;*        lda      tachconf_f
-;*        and      #$7f
+;*        lda      tachconf_f                                  ;* tachconf_f = %00000100
+;*        and      #$7f                                      ;* %01111111, result = 4T
 ;*        beq      CHK_REARM
-;tachoff:
+;*;tachoff:
 ;*        cbeqa    #1T,tachoff_x2
 ;*        cbeqa    #2T,tachoff_x3
 ;*        cbeqa    #3T,tachoff_x4
@@ -8855,8 +8900,8 @@ REARM_IRQ:
 ;*        bclr     output1,porta
 ;*        bra      CHK_REARM
 ;*tachoff_x5:
-        bclr     output2,porta
-        bra      CHK_REARM
+        bclr     output2,porta    ;* tacho  off
+;*        bra      CHK_REARM
 ;*tachoff_out3:
 ;*        bclr     output3,portd
 ;*        bra      CHK_REARM
@@ -8865,8 +8910,8 @@ REARM_IRQ:
 ;*        bra      CHK_REARM
 
 CHK_REARM:
-;*        brset    MSNEON,personality,INCRPMER	; irq always on in Neon mode
-;*        brset    WHEEL,personality,INCRPMER	; irq always on in Wheel mode
+;*        brset    MSNEON,personality,INCRPMER	; irq always on in Neon mode   ;* MSNEON = 0
+;*        brset    WHEEL,personality,INCRPMER	; irq always on in Wheel mode  ;* WHEEL = 1
 
 ;*        lda      feature6_f
 ;*        bit      #falsetrigb           ; can disable false trigger protection for testing
@@ -8925,20 +8970,20 @@ stall:
 
 stall_cont:
 ;*        brset    EDIS,personality,pass_store
-        lda      TriggAngle_f		; Calculate crank delay angle
-        sub      CrankAngle_f
+        lda      TriggAngle_f		; Calculate crank delay angle   ;* TriggAngle_f = 227T (80 degrees)
+        sub      CrankAngle_f                                       ;* CrankAngle_f = 10/.352=28 (10 degrees)
         add      #28T			; - -10 deg
         sta      DelayAngle
 pass_store:
-        lda      CrankAngle_f		; Update spark angle for user interface
+        lda      CrankAngle_f		; Update spark angle for user interface ;* CrankAngle_f = 10/.352=28 (10 degrees)
         sta      SparkAngle
-        lda      SparkHoldCyc_f		; Hold spark after stall
+        lda      SparkHoldCyc_f		; Hold spark after stall                ;* SparkHoldCyc_f = 0 (trigger signals)
         sta      wheelcount		; (HoldSpark)
-;*        brset    MSNEON,personality,wc_wheel
-;*        brset    WHEEL,personality,wc_wheel
+;*        brset    MSNEON,personality,wc_wheel                              ;* MSNEON = 0
+;*        brset    WHEEL,personality,wc_wheel                               ;* WHEEL = 1
 ;*        bra      ENABLE_THE_IRQ
-wc_wheel:
-        mov     #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff
+;*wc_wheel:
+        mov     #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff  ;* WHEELINIT = %11000011, $C3, 195T
         bclr    wsync,EnhancedBits6
         bset    whold,EnhancedBits6
         lda     #0
@@ -8966,19 +9011,19 @@ CHECK_MMS:
 ****************************************************************************
 
 MSEC:
-;*;        brset     egoIgnCount,feature1,No_Ego_mSec	; Are we using mSec
+;        brset     egoIgnCount,feature1,No_Ego_mSec	; Are we using mSec
 					; for ego counter?
 ;*        lda       feature14_f1
-;*        bit       #egoIgnCountb
+;*        bit       #egoIgnCountb                    ;* egoIgnCountb = 1 (Ignition Pulses)
 ;*        bne       No_Ego_mSec
 ;*        inc       egocount		; Increment EGO step counter
 
-No_Ego_mSec:
+;*No_Ego_mSec:
 
         inc      ms			; bump up millisec
         clr      mms
 
-;*        brclr    REUSE_LED18,outputpins,FIRE_ADC	; only do this if
+;*        brclr    REUSE_LED18,outputpins,FIRE_ADC	; only do this if   ;* REUSE_LED18 = 0
 					; using as IRQ monitor
 ;*        brset    REUSE_LED18_2,outputpins,FIRE_ADC	; not if spark c
 ;*        bil      IRQ_LOW		; Check if IRQ pin low
@@ -8992,7 +9037,7 @@ No_Ego_mSec:
 ;*        bset     wled,portc		; Turn ON IRQ led (in case of
 					; bouncing points or what ever)
 
-FIRE_ADC:
+;*FIRE_ADC:
 ; Fire off another ADC conversion, channel is pointed to by ADSEL
 	lda	adsel
 	ora	#%01000000
@@ -9018,12 +9063,12 @@ MSDONE:
         bra      end100th
 
 one00th:
-;*        brclr   Launch,portd,nol_timer		; Button is pressed so skip timer
+;*        brclr   Launch,portd,nol_timer ; Button is pressed so skip timer    ;* Launch = 0
 ;*        lda     n2olaunchdel
 ;*        beq     nol_timer               ; already zero
 ;*        sub     #1
 ;*        sta     n2olaunchdel
-nol_timer:
+;*nol_timer:
 
 ;        ;do similar for nitrous fuel hold on
 ;        brclr   ?????,????,non2o_timer		; Nitrous on so skip timer
@@ -9079,17 +9124,17 @@ ST2Timer_zero:
         beq     VE3Timer_zero
         dec     VE3Timer
 VE3Timer_zero:
-;*       brset   UseVE3,EnhancedBits,No_VE3_delay	; Are we running from VE3?
-       lda     VE3Delay_f
-       sta     VE3Timer
-No_VE3_delay:
-        brclr   NosIn,portd,No_St2Delay
-        lda     Spark2Delay_f		; If input not low reset ST2
-					; delay timer
-        sta     ST2Timer
-No_St2Delay:
+;*       brset   UseVE3,EnhancedBits,No_VE3_delay	; Are we running from VE3? ;* UseVE3 = 0
+;*       lda     VE3Delay_f                                                    ;* VE3Delay_f = 0
+;*       sta     VE3Timer
+;*No_VE3_delay:
+;*        brclr   NosIn,portd,No_St2Delay                                      ;* NosIn = 0
+;*        lda     Spark2Delay_f		; If input not low reset ST2               ;* Spark2Delay_f = 0
+;*					; delay timer
+;*        sta     ST2Timer
+;*No_St2Delay:
 
-;*        brset    taeIgnCount,feature1,No_TPSCount
+;*        brset    taeIgnCount,feature1,No_TPSCount                     ;* taeIgnCount = 1 (cycles)
 ;*        inc      tpsaclk
 
 ; Save current TPS reading in last_tps variable to compute TPSDOT
@@ -9102,16 +9147,18 @@ No_St2Delay:
 					;jump past KPa settings
 ;*       lda     kpa
 ;*       bra     Kpa_Dot_Mode
+
 ;******
 RTC_DONEJMP:
        jmp     RTC_DONE
 ;******
+
 ;*tps_dot_mode:
 ;*       lda      tps
 ;*Kpa_Dot_Mode:
 ;*       sta      TPSlast
 
-No_TPSCount:
+;*No_TPSCount:
 
 ; Check Magnus rev limit times
 
@@ -9130,25 +9177,25 @@ TimeLeft:
 ********************** seconds section ***********************************
 ****************************************************************************
 SECONDS:
-        inc      OverRunTime
+;*        inc      OverRunTime
 
 ;*	brclr	 IdleAdvTimeOK,EnhancedBits6,knock_timer_checks
 ;*	lda	 idlAdvHld
 ;*	inca
 ;*	sta	 idlAdvHld
 
-knock_timer_checks:
-        lda      KnockTimLft		; Load the knock timer
-        cmp      #00T
-        beq      Secs			; If its zero carry on with seconds
-        deca				; If not dec it
-        sta      KnocktimLft
-Secs:
+;*knock_timer_checks:
+;*        lda      KnockTimLft		; Load the knock timer
+;*        cmp      #00T
+;*        beq      Secs			; If its zero carry on with seconds
+;*        deca				; If not dec it
+;*        sta      KnocktimLft
+;*Secs:
 ;*        lda      feature10_f5
-;*        bit      #ASEIgnCountb
+;*        bit      #ASEIgnCountb                     ;* ASEIgnCountb = 0 (cycles)
 ;*        beq      sec_cont
-        inc      ASEcount
-sec_cont:
+;*        inc      ASEcount
+;*sec_cont:
 ; crank mode inhibit
 ; make a 1-2 second delay
 ; if running and !cranking and !cant_delay then set cant_delay
@@ -9225,38 +9272,38 @@ SPARKTIME:
 					; on time when going slow
                 brset   indwell,EnhancedBits4,j_hires_dwell	; start dwell
 					; period
-;*                brset   EDIS,personality,set_spkon
-;*                brclr   SparkTrigg,Sparkbits,NOTSPKTIME	; Should never do this
+;*                brset   EDIS,personality,set_spkon                ;* EDIS = 0
+                brclr   SparkTrigg,Sparkbits,NOTSPKTIME	; Should never do this
 
 ;spark cut used to be here, but moved to TIMERROLL to eliminate chance of
 ;overheating ignitors when in spark-cut because coils were left switched ON
 
-set_spkon:
+;*set_spkon:
                 brclr   SparkTrigg,Sparkbits,INT_SPARK_OFFa	; Check for
 					; spark trigg, used end of pulse
-set_spkon2:
+;*set_spkon2:
                 bset    sparkon,revlimbits	; spark now on
-;*                brset   invspk,EnhancedBits4,sson_inv
+;*                brset   invspk,EnhancedBits4,sson_inv          ;* invspk = 1
 ;*                COILNEG			; macro = fire coil for non-inverted
 ;*                bra     SparkOnDone
-sson_inv:
+;*sson_inv:
                 COILPOS			; macro = fire coil for inverted
-SparkOnDone:
-;*                brclr   EDIS,personality,sod_ne
+;*SparkOnDone:
+;*                brclr   EDIS,personality,sod_ne                 ;* EDIS = 0
 ;*                jmp     set_saw_on
 ;*jsod_cd_done:   jmp     sod_cd_done
 
 sod_ne:
                 bclr    TOIE,T2SC1	; Disable interrupts
-;*                brset   dwellcont,feature7,sod_cd
+;*                brset   dwellcont,feature7,sod_cd               ;* dwellcont = 1
 ;*                brset   min_dwell,feature2,jsod_cd_done	; don't schedule
 					; here if minimal dwell wanted
-sod_cd:
+;*sod_cd:
                 CalcDwellspk		; Set spark on time
-sod_cd_done:
+;*sod_cd_done:
 ;now check if we should schedule a trailing spark
-;*                brset   rotary2,EnhancedBits5,chktrail
-sparktime_exit:
+;*                brset   rotary2,EnhancedBits5,chktrail          ;* rotary2 = 0
+;*sparktime_exit:
                 bclr    SparkTrigg,Sparkbits	; No more sparks for this IRQ
 NOT_SPARK_TIME:
                 pulh
@@ -9296,9 +9343,9 @@ NOT_SPARK_TIME:
 ;*                lda     splitdelL
 ;*                cmp     #64T             ; 64us
 ;*                bhi     split_timed
-;split_min_set:
-;                clr     splitdelL
-;                mov     #64T,splitdelH
+;*;split_min_set:
+;*;                clr     splitdelL
+;*;                mov     #64T,splitdelH
 ;*                jmp     set_spkon2     ; jump back up to fire next spark
 ;*split_timed:
 ;*                lda     T2CNTL		; unlatch low byte
@@ -9332,7 +9379,7 @@ NOT_SPARK_TIME:
 ;*to_inv:         bclr    coilb,portc
 ;*to_exit:
 ;*                bclr    SparkTrigg,Sparkbits	; No more sparks for this IRQ
-;*;kill the dwell timers for trailing in the mainloop
+;kill the dwell timers for trailing in the mainloop
 ;*                pulh
 ;*                rti
 
@@ -9342,13 +9389,13 @@ hires_dwell:
 
 ;first turn on coil, then reset T2 to spark point saved in sparktargetH/L
 ;spark cut- actually cut the coil-on
-;*                lda     SparkCutCnt	; Check Spark Counter
-;*                inca
-;*                cmp     SparkCutBase_f	; How many sparks to count to
-;*                blo     Dont_ResetCnt2
-;*                lda     #01T
-;*Dont_ResetCnt2:
-;*                sta     SparkCutCnt	; Store new value to spark counter
+                lda     SparkCutCnt	; Check Spark Counter
+                inca
+                cmp     SparkCutBase_f	; How many sparks to count to  ;* SparkCutBase_f = 6T
+                blo     Dont_ResetCnt2
+                lda     #01T
+Dont_ResetCnt2:
+                sta     SparkCutCnt	; Store new value to spark counter
 ;*                brset   sparkCut,RevLimBits,bhrds	; If in spark cut
 					; mode jump past spark
 
@@ -9356,23 +9403,23 @@ hires_dwell:
 ;*                COILPOS			; macro = charge coil for non-inverted
 ;*bhrds:
 ;*                bra     hrd_set
-hrd_inv:
-                COILNEG			; macro = charge coil for inverted
-hrd_set:
-                bclr    indwell,EnhancedBits4	; turn it off so next
+;*hrd_inv:
+;*                COILNEG			; macro = charge coil for inverted
+;*hrd_set:
+;*                bclr    indwell,EnhancedBits4	; turn it off so next
 					; sparktime fires coil
-                bclr    sparkon,revlimbits	; spark now on
-;store pre-calculated spark time into timer and set it off
-                lda     SparkTargetH
-                sta     T2CH1H
-                lda     SparkTargetL
-                sta     T2CH1L
+;*                bclr    sparkon,revlimbits	; spark now on
+;*;store pre-calculated spark time into timer and set it off
+;*                lda     SparkTargetH
+;*                sta     T2CH1H
+;*                lda     SparkTargetL
+;*                sta     T2CH1L
 
-                bclr    TOF,T2SC1	; clear any pending interrupt
-                bset    TOIE,T2SC1	; Enable timer interrupt
+;*                bclr    TOF,T2SC1	; clear any pending interrupt
+;*                bset    TOIE,T2SC1	; Enable timer interrupt
 
-                pulh
-                rti
+;*                pulh
+;*                rti
 
 ;*set_saw_on:				; now set timer for SAW on period
 					; using sawh/l calculated in main loop
@@ -9391,7 +9438,7 @@ hrd_set:
 ;*                beq     SAW_COUNTER
 ;*;                brclr   multispark,feature4,SAW_COUNTER
 
-; at crank we always send 2048us as calibration and multi-spark init
+;*; at crank we always send 2048us as calibration and multi-spark init
 ;*                clr     sawl
 ;*                mov     #$08,sawh
 
@@ -9406,7 +9453,7 @@ hrd_set:
 ;*                stx     T2CH1L
 
 ;*                bclr    SparkTrigg,Sparkbits	; Clear spark trigg.
-;*					; Next time we get int turn off SAW
+					; Next time we get int turn off SAW
 
 ;*                bclr    TOF,T2SC1	; clear any pending interrupt
 ;*                bset    TOIE,T2SC1	; Enable timer interrupt
@@ -9422,7 +9469,7 @@ hrd_set:
 
 INT_SPARK_OFF:				; this is only used for EDIS so
 					; coilc has no meaning (yet!)
-;*                brset   invspk,EnhancedBits4,InvSparkOff
+;*                brset   invspk,EnhancedBits4,InvSparkOff     ;* invspk = 1
 
 ;*                brset   REUSE_FIDLE,outputpins,stimef2
 ;*                brset   coilbbit,coilsel,stimeb2
@@ -9434,8 +9481,8 @@ INT_SPARK_OFF:				; this is only used for EDIS so
 ;*stimef2:
 ;*                bclr    iasc,porta
 ;*                bra     SparkOffDone
-InvSparkOff:
-;*                brset   REUSE_FIDLE,outputpins,isof2
+;*InvSparkOff:
+;*                brset   REUSE_FIDLE,outputpins,isof2       ;* REUSE_FIDLE = 0
                 brset   coilbbit,coilsel,isob2
                 bset    coila,portc	; Set inverted spark on
                 bra     SparkOffDone
@@ -9449,7 +9496,7 @@ SparkOffDone:
                 bclr    TOIE,T2SC1	; Disable interrupts
                 pulh
                 rti
-*** end EDIS ***
+;**** end EDIS ***
 
 ***************************************************************************
 **
@@ -9486,7 +9533,11 @@ avgtth12l:   equ   itmp1d    ; 1/2 of avg tooth
 offsetstep:  equ   itmp1e    ; offset step (used by oddfire)
 offsetang:   equ   itmp1f    ; offset angle (used by oddfire)
 
-DOSQUIRT:
+;*************************************************************************
+
+DOSQUIRT:   ;* IRQ - Input trigger for new pulse event
+
+;*************************************************************************
         pshh
 ;First thing to do is read the current T2 value
 ;this should ensure the maximum spark accuracy. Delay value will be based on timer HERE
@@ -9511,18 +9562,18 @@ no_rollchk:
 
 
 ;check for simulator first
-;*        brset   whlsim,feature1,jwheelsim
+;*        brset   whlsim,feature1,jwheelsim                     ;* whlsim = 0
 
-;*        brset   MSNEON,personality,decode_neon
-;*        brset   WHEEL,personality,jdecode_wheel
+;*        brset   MSNEON,personality,decode_neon                ;* MSNEON = 0
+;*        brset   WHEEL,personality,jdecode_wheel               ;* WHEEL = 1
 ;set just single coil output
 ;*        clr     coilsel
 ;*        bset    coilabit,coilsel
 ;*        jmp     done_decode		; everything else that doesn't
 					; need wheel decoding
 
-jdecode_wheel:
-;*        brset   wd_2trig,feature1,jdecode_wheel2
+;*jdecode_wheel:
+;*        brset   wd_2trig,feature1,jdecode_wheel2                ;* wd_2trig = 0
         jmp   decode_wheel
 ;*jdecode_wheel2:
 ;*        jmp   decode_wheel2
@@ -9532,7 +9583,7 @@ jdecode_wheel:
 
 ;*decode_neon:
 
-;new - are we logging teeth?
+;*;new - are we logging teeth?
 ;*        brclr   toothlog,EnhancedBits5,n_notlog
 ;*        ;we are logging so record something
 ;*        clrh
@@ -9548,7 +9599,7 @@ jdecode_wheel:
 ;*        clrx
 ;*        lda     numteeth_f
 ;*        cmp     #23T			; hard coded lowres/highres
-					; transition (was 20T)
+;*					; transition (was 20T)
 ;*        bhi     nth
 ;*        lda     #1                      ; 1 = 0.1ms units
 ;*        bra     nts
@@ -9579,7 +9630,7 @@ jdecode_wheel:
 
 ;*tooth_sync:				; ignore first few pulses
 ;*        brclr   6,wheelcount,tooth_decode2	; if bit 6 clr then we've
-;*					; done holdoff
+					; done holdoff
 ;*        dec     wheelcount
 ;*        bne     tooth_rti
 ;*        bclr    6,wheelcount
@@ -9590,7 +9641,7 @@ jdecode_wheel:
 ;*        lda     stH
 ;*        sta     stHp
 ;*        pulh
-;*        rti
+ ;*       rti
 
 ;*tooth_decode2:
 
@@ -9610,7 +9661,7 @@ jdecode_wheel:
 ;*        lsr     cTimeH
 ;*        ror     cTimeL    ; was rol - typo!
 
-        ;now see if this period/4 > previous
+;*        ;now see if this period/4 > previous
 ;*        lda     cTimeH
 ;*        cmp     stHp
 ;*        blo     tooth_rti
@@ -9623,7 +9674,7 @@ jdecode_wheel:
 ;*tooth_found:  ; this is when we've found the first tooth of the sequence
 
 ;*        mov     #3T,wheelcount		; clear !sync bit in process
-;move save lowres values into "previous" variable
+;*;move save lowres values into "previous" variable
 ;*        lda     stL
 ;*        sta     stLp
 ;*        lda     stH
@@ -9675,7 +9726,7 @@ jdecode_wheel:
 ;*        brset   coilerr,revlimbits,set_b_clr
 ;*        brset   coilabit,coilsel,set_b_clr	; we are expecting this
 ;*        bset    coilerr,revlimbits	; out of sync once, so ignore
-					; and follow instinct
+;*					; and follow instinct
 ;*        bra     set_a_detect
 ;*set_b_clr:
 ;*        bclr    coilerr,revlimbits	; reset error bit
@@ -9685,11 +9736,11 @@ jdecode_wheel:
 
 ;*j_done_cd:  jmp   done_decode
 
-****************************************************************************
-**  Wheel simulator. Allows any special decoders to be tested on the stim
-**  doesn't look for any pattern, just cycles through outputs. Trigger
-**  return WILL NOT WORK
-**  Flash variable determines how many outputs, use wheelcount as counter
+;****************************************************************************
+;**  Wheel simulator. Allows any special decoders to be tested on the stim
+;**  doesn't look for any pattern, just cycles through outputs. Trigger
+;**  return WILL NOT WORK
+;**  Flash variable determines how many outputs, use wheelcount as counter
 ****************************************************************************
 ;*wheelsim:
 ;*       lda      wheelcount
@@ -9728,17 +9779,17 @@ jdecode_wheel:
 
 ;*wheelsimdone:
 ;*       jmp      done_decode
-****************************************************************************
-**  Wheel decoder 2. No missing teeth but a second wheel with "reset" tabs
-**
-**  The 0.1ms section looks out for the second pulse but we check here too
-**  on the rising edge the wheelcount is reset to zero so the next real pulse
-**  is tooth no.1
-**  This is what the Mazda and Toyota guys are after.
-**  Could also be used to do COP on a 4cyl by mounting the "reset" tab on the
-**  cam and having two tabs on the crank.
-****************************************************************************
-;*decode_wheel2:
+;****************************************************************************
+;**  Wheel decoder 2. No missing teeth but a second wheel with "reset" tabs
+;**
+;**  The 0.1ms section looks out for the second pulse but we check here too
+;**  on the rising edge the wheelcount is reset to zero so the next real pulse
+;**  is tooth no.1
+;**  This is what the Mazda and Toyota guys are after.
+;**  Could also be used to do COP on a 4cyl by mounting the "reset" tab on the
+;**  cam and having two tabs on the crank.
+;****************************************************************************
+;decode_wheel2:
 
 ;repeat check in here, in case two triggers come at once
 ;on rising edge of input reset wheelcount to zero
@@ -9792,7 +9843,7 @@ jdecode_wheel:
 
 ;new - are we logging teeth?
 ;*        brclr   toothlog,EnhancedBits5,w2dec_notlog
-        ;we are logging so record something
+;*        ;we are logging so record something
 ;*        clrh
 ;*        ldx     VE_r+PAGESIZE-2
 ;*        lda     cTimeH
@@ -9852,19 +9903,19 @@ jdecode_wheel:
 **
 ****************************************************************************
 decode_wheel:
-        lda     numteeth_f
-        cmp     #23T			; hard coded lowres/highres
-					; transition (was 20T)
-        bhi     w_high
-;XXXX
-;        brclr    crank,engine,w_high  ;; XXXX try this to get rpm below 100
-w_low:
-;as per Neon, use cTimeH/L where poss as it is zp
-        ;use lowres timer for calcs
-        mov     lowresL,cTimeL
-        mov     lowresH,cTimeH
+;*        lda     numteeth_f                                   ; numteeth = 36T
+;*        cmp     #23T			; hard coded lowres/highres
+;*					; transition (was 20T)
+ ;*       bhi     w_high
+;*;XXXX
+;*;        brclr    crank,engine,w_high  ;; XXXX try this to get rpm below 100
+;*w_low:
+;*;as per Neon, use cTimeH/L where poss as it is zp
+;*        ;use lowres timer for calcs
+;*        mov     lowresL,cTimeL
+;*        mov     lowresH,cTimeH
 
-        bra     w_decode
+;*        bra     w_decode
 
 w_high:
         lda     rpm
@@ -9933,15 +9984,15 @@ w_dec_notlog:
 
 ;Ryan reports problems with the NEW routine below, so now config option to use 024s9
 ;style decoder instead. This way can swap versions on the fly
-;*        lda     feature6_f
-;*        bit     #wheel_oldb
-;*        beq     decoder_new ; 0 = new decoder
+        lda     feature6_f
+        bit     #wheel_oldb                     ;* wheel_oldb = 0 (but leave option open)
+        beq     decoder_new ; 0 = new decoder
 
         ;bypass the tooth false trigger
         ;load up old vars into new ones
-;*;        mov     stHp,avgtoothh   ; now the same thing
-;*;        mov     stLp,avgtoothl
-;*        bra     w_decode_ok
+;        mov     stHp,avgtoothh   ; now the same thing
+;        mov     stLp,avgtoothl
+        bra     w_decode_ok
 
 decoder_new:
 ;NEW
@@ -10041,22 +10092,22 @@ is_miss:
 ; i.e. on a 60-2,  0-359 deg =  0-59
 ;                360-719 deg = 60-119
 
-        brclr   trigger2,EnhancedBits6,not_2ndmiss
-        lda     numteeth_f   ; from 028c now holds 2 revs number (i.e. 60-2 -> 120)
-        lsra
-        sta     wheelcount
-        bclr    trigger2,EnhancedBits6    ; clear flag
+        brclr   trigger2,EnhancedBits6,not_2ndmiss            ;* trigger2 = 0
+;*        lda     numteeth_f   ; from 028c now holds 2 revs number (i.e. 60-2 -> 120)
+;*        lsra
+;*        sta     wheelcount
+;*        bclr    trigger2,EnhancedBits6    ; clear flag
 not_2ndmiss:
         bset    wsync,EnhancedBits6
-;*        brclr   WHEEL2,personality,not_miss
+;*        brclr   WHEEL2,personality,not_miss                    ;* WHEEL2 = 0
 ;*        inc     wheelcount
 not_miss:
 
         brset   crank,engine,tooth_noavg    ; do not use 025 style during cranking
 ;check if using old decoder
         lda     feature6_f
-;*        bit     #wheel_oldb
-;*        beq     tooth_avg
+        bit     #wheel_oldb                                   ;* wheel_oldb = 0 (but leave option open)
+        beq     tooth_avg
 
 tooth_noavg:
 ;like old method, just store previoud period
@@ -10116,7 +10167,7 @@ not_miss_skip:
         brclr   wsync,EnhancedBits6,jretw  ; if non synced then wheelcount is meaningless
         inc     wheelcount
         lda     wheelcount
-        cmp     numteeth_f
+        cmp     numteeth_f                                           ;* numteeth = 36T
         bls     not_miss_ok
         jmp     lost_sync_w
 not_miss_ok:
@@ -10126,15 +10177,14 @@ jretw:
 wc_op:
 ;see if our tooth matches the user input trigger point
         lda     wheelcount
-;*        brclr   nextcyl,EnhancedBits4,wc_op2
+;*        brclr   nextcyl,EnhancedBits4,wc_op2                   ;* nextcyl = 0
 ;*        brclr   wspk,EnhancedBits4,wc_op2   ; if not multi output doesn't matter
-
 ;if running next-cyl and wheel decoder we would send running output to the
 ;wrong coil unless we take this action here...
 ;(doesn't work?)
 
 ;check if 4th spark output in use
-;*                brset   out3sparkd,feature2,wdnc4
+;*                brset   out3sparkd,feature2,wdnc4               ;* out3sparkd = 0
 ;check if 3rd spark output in use
 ;don't check for 2nd output, wouldn't have got here otherwise
 ;*                brclr   REUSE_LED18,outputpins,wdnc2    ; want 1 } spark c
@@ -10171,7 +10221,7 @@ wc_op2:
         beq     w_trig1
         cmp     trig2_f
         beq     w_trig2
-        cmp     trig3_f
+;*        cmp     trig3_f
 ;*        beq     w_trig3
 ;*        cmp     trig4_f
 ;*        beq     w_trig4
@@ -10181,7 +10231,7 @@ wc_op2:
 ;*        beq     w_trig6
 
 wc_op3:
-	brset	rsh_r,EnhancedBits5,ret_w ; don't check if doing trailing
+;*	brset	rsh_r,EnhancedBits5,ret_w ; don't check if doing trailing     ;*rsh_r = 0
         cmp     trig1ret_f
         beq     w_trigret1
         cmp     trig2ret_f
@@ -10202,7 +10252,7 @@ w_trig1:
         jmp     w_store2
 
 w_trig2:
-        brclr   REUSE_LED19,outputpins,w_trig1	; if spark B not defined
+;*        brclr   REUSE_LED19,outputpins,w_trig1	; if spark B not defined     ;* REUSE_LED19 = 1
 					; then just one o/p
         clr     coilsel
         bset    coilbbit,coilsel
@@ -10250,7 +10300,7 @@ w_trigret1:
         bra     ret_w2
 
 w_trigret2:
-;*        brclr   REUSE_LED19,outputpins,w_trigret1	; if spark B not
+;*        brclr   REUSE_LED19,outputpins,w_trigret1	; if spark B not        ;* REUSE_LED19 = 1
 					; defined then just one o/p
         clr     coilsel
         bset    coilbbit,coilsel
@@ -10285,7 +10335,7 @@ lost_sync_w:				; we found too many teeth after
 					; also do holdoff. This should be
 					; rare, but if we lost sync that
 					; bad we'd better start all over
-        mov     #WHEELINIT,wheelcount	; was %10000000 (missing #)
+        mov     #WHEELINIT,wheelcount	; was %10000000 (missing #)     ;* WHEELINIT = %11000011, $C3, 195T
         bclr    wsync,EnhancedBits6
         bset    whold,EnhancedBits6
 ;NEW
@@ -10313,36 +10363,36 @@ w_store:
 ** accurate timing
 *****************************************************************************
 done_decode:
-;*        brclr   REUSE_LED18,outputpins,dcd_no_led
+;*        brclr   REUSE_LED18,outputpins,dcd_no_led               ;* REUSE_LED18 = 0
 ;*        brset   REUSE_LED18_2,outputpins,dcd_no_led	; if coil c
 ;*        bset    wled,portc		; Turn on IRQ led, orig MSnS code
 ;*dcd_no_led:
 
 ;tacho output
-        lda     tachconf_f
-        bit     #$7f
-        beq     tach_done
-        bit     #$80     ; see if in divide by 2 mode
-        beq     tach_full
-        lda     EnhancedBits5
-        eor     #ctodivb
-        sta     EnhancedBits5
-        bit     #ctodivb
-        beq     tach_done
-tach_full:
+;*        lda     tachconf_f                               ;* tachconf_f = %00000100
+;*        bit     #$7f                                      ;* %01111111, result = 1
+;*        beq     tach_done
+;*        bit     #$80     ; see if in divide by 2 mode    ;* %10000000, result = 0
+;*        beq     tach_full
+;*        lda     EnhancedBits5
+;*        eor     #ctodivb
+;*        sta     EnhancedBits5
+;*        bit     #ctodivb
+;*        beq     tach_done
+;*tach_full:
 
-; Tacho ouput
-        lda      tachconf_f
-        and      #$7f
-        beq      tach_done
-;tachon:
+;*; Tacho ouput
+;*        lda      tachconf_f                             ;* tachconf_f = %00000100
+;*        and      #$7f                                  ;* %01111111, result = 4T
+;*        beq      tach_done
+;*;tachon:
 ;*        cbeqa    #1T,tachon_x2
 ;*        cbeqa    #2T,tachon_x3
 ;*        cbeqa    #3T,tachon_x4
-        cbeqa    #4T,tachon_x5
+;*        cbeqa    #4T,tachon_x5
 ;*        cbeqa    #5T,tachon_out3
 ;*        cbeqa    #6T,tachon_pin10
-        bra      tach_done
+;*        bra      tach_done
 ;*tachon_x2:
 ;*        bset     water,porta
 ;*        bra      tach_done
@@ -10352,9 +10402,9 @@ tach_full:
 ;*tachon_x4:
 ;*        bset     output1,porta
 ;*        bra      tach_done
-tachon_x5:
-        bset     output2,porta
-        bra      tach_done
+;*tachon_x5:
+        bset     output2,porta    ;* tacho on
+;*        bra      tach_done
 ;*tachon_out3:
 ;*        bset     output3,portd
 ;*        bra      tach_done
@@ -10362,7 +10412,7 @@ tachon_x5:
 ;*        bset     pin10,portc
 ;*;        bra      tach_done
 
-tach_done:
+;*tach_done:
 ;save old values
         mov       iTimeX,iTimepX
         mov       iTimeH,iTimepH
@@ -10395,9 +10445,9 @@ noitx_err:
 ;;;;CODE TO FIX DROPOUT
 
 ;check for dual dizzy feature
-;*        brclr   WHEEL,personality,nondualdizzy  ; if not wheel decoder then skip
+;*        brclr   WHEEL,personality,nondualdizzy  ; if not wheel decoder then skip   ;* WHEEL = 1
 ;*        lda     feature6_f
-;*        bit     #dualdizzyb
+;*        bit     #dualdizzyb                                                        ;* dualdizzy = 0
 ;*        beq     nondualdizzy
 ;*        brset   coilbbit,coilsel,dualdb
 ;*        brset   coilcbit,coilsel,dualda
@@ -10420,13 +10470,15 @@ noitx_err:
 ; will be set when we get here. If this is the case then we'd better
 ; fire the coil right now.
 ;
-;*        brclr   nextcyl,EnhancedBits4,j_miss_ckskp  ; ONLY for next-cylinder
-;the nextcyl bit is only set for valid personalities
+;*        brclr   nextcyl,EnhancedBits4,j_miss_ckskp  ; ONLY for next-cylinder   ;* nextcyl = 0
+;*;the nextcyl bit is only set for valid personalities
 
 ;*        brset   crank,engine,miss_chk         ; at crank we ALWAYS fire at trigger
 ;*        brset   SparkTrigg,Sparkbits,miss_chk ; if set then we missed one
 
-;*j_miss_ckskp:    jmp     miss_chk_skip
+;*j_miss_ckskp:
+;*    jmp     miss_chk_skip
+
 ;*miss_chk:
 
 ;*        brset   invspk,EnhancedBits4,mc_inv
@@ -10465,9 +10517,9 @@ noitx_err:
 	deca				; idle seconds clock
 	sta	idleDelayClock
 delay_done:
-;*	brclr	REStaging,EnhancedBits,cont_inc_counters
-;*	brset	StgTransDone,EnhancedBits6,cont_inc_counters
-	; if we're here, we're supposed to be incrementing the staging counter
+;*	brclr	REStaging,EnhancedBits,cont_inc_counters           ;* REStaging = 0
+;*	brset	StgTransDone,EnhancedBits6,cont_inc_counters      ;* StgTransDone = 1
+;*	; if we're here, we're supposed to be incrementing the staging counter
 ;*	lda	stgTransitionCnt
 ;*	inca
 ;*	sta	stgTransitionCnt
@@ -10478,13 +10530,13 @@ cont_inc_counters:
 	bne     EGOBUMP		       ; Only increment counters if
 					; cylinder count is zero
 ;*        lda     feature10_f5
-;*        bit     #ASEIgnCountb
+;*        bit     #ASEIgnCountb                               ;* ASEIgnCountb = 0 (cycles)
 ;*        bne     TPS_COUNTER
         inc      asecount		; Increment after-start enrichment
 					; counter
 
 TPS_COUNTER:
-;*      brclr    taeIgnCount,feature1,EGOBUMP	; Are we in Cycle counter
+;*      brclr    taeIgnCount,feature1,EGOBUMP	; Are we in Cycle counter  ;* taeIgnCount = 1 (cycles)
 					; mode for TPS Accel?
       inc      tpsaclk			; Yes so increment counter
 
@@ -10492,25 +10544,25 @@ TPS_COUNTER:
 ; acceleration enrichment section or KPa in KPa last if in MAP dot
 
 ;*       lda     feature4_f
-;*       bit     #KpaDotSetb
+;*       bit     #KpaDotSetb                                                 ;* KpaDotSetb = 0
 ;*       beq     tps_dot_on
 ;*;       brclr   KpaDotSet,feature4,tps_dot_on	; If not in KPA dot mode
-					; jump past KPa settings
+;*					; jump past KPa settings
 ;*       lda     kpa
 ;*       bra     Kpa_Dot_on
-tps_dot_on:
+;*tps_dot_on:
        lda      tps
 Kpa_Dot_on:
        sta      TPSlast
 
 EGOBUMP:
-       	lda	  rpm
-;	sta	  old_rpm1      ; Used in odd-fire code - save the last computed RPM for average
+;*       	lda	  rpm
+;*;	sta	  old_rpm1      ; Used in odd-fire code - save the last computed RPM for average
 
-;        brclr     egoIgnCount,feature1,No_Ego_Cnt
-        lda       feature14_f1
-        bit       #egoIgnCountb
-        beq       No_Ego_Cnt
+;*;        brclr     egoIgnCount,feature1,No_Ego_Cnt
+;*        lda       feature14_f1
+;*        bit       #egoIgnCountb                               ;* egoIgnCountb = 1 (Ignition Pulses)
+;*        beq       No_Ego_Cnt
         inc       egocount		; Increment EGO step counter
 No_Ego_Cnt:
         brset   running,engine,CYCLE_CALC	; should always be running
@@ -10531,12 +10583,12 @@ CYCLE_CALC:
 ;excessively if we do 24bit maths here in an interrupt handler.
 ;Stick with Magnus' 0.1ms method for now as it works.
 
-;*        brclr   EDIS,personality,non_edis
+;*        brclr   EDIS,personality,non_edis         ;* EDIS = 0
 ;*        jmp     edis_speed
-non_edis:
+;*non_edis:
 ;are we doing oddfire wheel ?
 ;*        lda     SparkConfig1_f
-;*        bit     #M_SC1oddfire
+;*        bit     #M_SC1oddfire                      ;* M_SC1oddfire = 0
 ;*        beq     CCnot_odd
 ;*        brset   coilabit,coilsel,CCofa
 ;*        brset   coilbbit,coilsel,CCofb
@@ -10587,7 +10639,7 @@ non_edis:
 ;*        sta      offsetang
 ;*        bra      CC_cont
 
-CCnot_odd:
+;*CCnot_odd:
         lda     #0
         sta     offsetang
         sta     offsetstep
@@ -10605,7 +10657,7 @@ CC_cont:
 ;*        clr     coilsel
 ;*        bset    coilabit,coilsel
 ;If trigg angle zero used fixed delay
-;*        lda     TriggAngle_f
+;*        lda     TriggAngle_f                             ;* TriggAngle_f = 227T (80 degrees)
 ;*        sta     DelayAngle
 ;*        bne     VARIABLE_DELAY
 ;*        lda     #$40			; 10us delay. Try 64us
@@ -10621,13 +10673,13 @@ CC_cont:
 LOW_SPEED:
         bclr    SparkHSpeed,SparkBits	; Turn off high speed ignition
         bset    SparkLSpeed,SparkBits	; Turn on low speed ignition
-;*        brclr   TFI,personality,LOW_cont
-;TFI mode - set the output now (follow IRQ at low speed)
+;*        brclr   TFI,personality,LOW_cont                       ;* TFI = 0
+;*;TFI mode - set the output now (follow IRQ at low speed)
 ;*        bset    sparkon,revlimbits	; spark now on
 ;*        bclr    sparktrigg,sparkbits	; don't want another one
 
 ;*        brset   invspk,EnhancedBits4,InvLSparkOn2
-;; Don't support coils b,c,d in TFI
+;*;; Don't support coils b,c,d in TFI
 
 ;*NInvLSparkOn2:
 ;*        brset   REUSE_FIDLE,outputpins,dslsf2
@@ -10645,33 +10697,34 @@ LOW_SPEED:
 ;*tfi_cont:
 ;*        jmp     SKIP_CYCLE_CALC
 
-LOW_cont:
+;*LOW_cont:
 
         bra     DELAY_CALC
 
 ASIS_SPEED:
-        ;need to check for low speed+TFI or we'll miss the output
-;*        brclr   TFI,personality,DELAY_CALC
+;*        ;need to check for low speed+TFI or we'll miss the output
+;*        brclr   TFI,personality,DELAY_CALC                          ;* TFI = 0
 ;*        brclr   SparkLSpeed,SparkBits,DELAY_CALC
 ;*        bra     LOW_SPEED
+		bra    DELAY_CALC     ;* RJH 7/25/23
 
 ;*VARIABLE_DELAY:
 
 HIGH_SPEED:
-;*;        brclr   TFI,personality,HIGH_cont
-;*;        lda     rpm
-;*;        cmp     #6			; if < 600rpm and TFI then low speed
-;*;        blo     LOW_SPEED
-;*HIGH_cont:
+;        brclr   TFI,personality,HIGH_cont
+;        lda     rpm
+;        cmp     #6			; if < 600rpm and TFI then low speed
+;        blo     LOW_SPEED
+HIGH_cont:
 ;hei7 bypass now in main loop
         bset    SparkHSpeed,SparkBits	; Turn on high speed ignition
         bclr    SparkLSpeed,SparkBits	; Turn off low speed ignition
 
 DELAY_CALC:
-        lda     config11_f1		; Get engine config
-        nsa
-        and     #$0f			; Mask out cylinders  (was $07)
-        inca				; Prepare loop counter
+        lda     config11_f1		; Get engine config                    ;* config11_f = %00110001
+        nsa                                                            ;*                %00010011
+        and     #$0f			; Mask out cylinders  (was $07)        ;*                %00001111
+        inca				; Prepare loop counter                     ;*                %00000011 + 1 = %00000100 = 4T
         tax				; stick in into X for safe keeping
 
 ; accel/decel correction..
@@ -10736,21 +10789,21 @@ ReCalcDelay:
         lda     cTimeH
         sta     ctimeHcp
 
-        txa
+        txa                                                          ;* Accu A = 4T
 ;*        cmp     #4
 ;*        bhi     more4cyl		; more than 4cyl
 ;*        cbeqa   #3T,cyl3		; 3cyl does 2/4 stroke internally
 
 ;*        tax				;1,2,4 are so simple do them here
 ;*        lda     config11_f1
-;*        bit     #M_TwoStroke
+;*        bit     #M_TwoStroke                                        ;* M_TwoStroke = 0
 ;*        beq     lt4_4s			; eq 0 so branch 4 stroke
-        ; 2 stroke for 1,2,4
+;*        ; 2 stroke for 1,2,4
 ;*        txa
 ;*        cbeqa   #1T,jsmd4
 ;*        cbeqa   #2T,jsmd2
 ;*        cbeqa   #4T,jsmt
-        ; 4 stroke for 1,2,4
+;*        ; 4 stroke for 1,2,4
 ;*lt4_4s:
 ;*        txa
 ;*        cbeqa   #1T,jsmd8
@@ -10781,7 +10834,9 @@ ReCalcDelay:
 ;some jumps
 ;*jsmd8:  jmp    spk_mult_div8
 ;*jsmd4:  jmp    spk_mult_div4
-;*jsmd2:  jmp    spk_mult_div2
+;*jsmd2:
+        jmp    spk_mult_div2
+
 ;*jsmt:   jmp    spk_mult
 
 ;** special faster routines to calculate the delay. **
@@ -10864,7 +10919,7 @@ ReCalcDelay:
 ;*        rol     SparkCarry
 
 ;*        lsl     SparkTempL		; *2
-;*        rol     SparkTempH
+;*       rol     SparkTempH
 ;*        rol     SparkCarry
 
 ;*        lda     SparkTempL		; +1 more
@@ -10915,7 +10970,7 @@ ReCalcDelay:
 ;*        ror     SparkTempH
 ;*        ror     SparkTempL
 
-;*spk_mult_div2:
+spk_mult_div2:
         lsr     SparkCarry		; /2
         ror     SparkTempH
         ror     SparkTempL
@@ -10943,7 +10998,7 @@ NoSparkCarry:
 
 ;check for oddfire offset
 ;*        lda     SparkConfig1_f
-;*        bit     #M_SC1oddfire
+;*        bit     #M_SC1oddfire                                           ;* M_SC1oddfire = 0
 ;*        beq     ck_xlong       ; not oddfire, use normal method
 ;now add oddfire triggers
 ;*        lda     offsetstep
@@ -10966,25 +11021,25 @@ NoSparkCarry:
 ;*ck_xlong:
         ; Check for long trigger (more than 90 deg)
 ;*        lda     SparkConfig1_f
-;*        bit     #M_SC1LngTrg
+;*        bit     #M_SC1LngTrg                                    ;* M_SC1LngTrg = 0
 ;*        beq     ck_nextcyl
 
 ;*xl45:
-        ; Divide 90 deg time by 2 to get 45 deg time (112.5 to 135 deg)
+;*        ; Divide 90 deg time by 2 to get 45 deg time (112.5 to 135 deg)
 ;*        lsr     SparkTempH
 ;*        ror     SparkTempL
 
-        ; Jump out if extra long trigger
+;*        ; Jump out if extra long trigger
 ;*        bit     #M_SC1XLngTrg
 ;*        bne     AddLongTrigg
 
 ;*xl22:
-        ; Divide 45 deg time by 2 to get 22.5 deg time (90 to 112.5 deg)
+;*        ; Divide 45 deg time by 2 to get 22.5 deg time (90 to 112.5 deg)
 ;*        lsr     SparkTempH
 ;*        ror     SparkTempL
 
 ;*AddLongTrigg:
-        ; Add extra time for long trigger
+;*        ; Add extra time for long trigger
 ;*        lda     SparkDelayL
 ;*        add     SparkTempL
 ;*        sta     SparkDelayL
@@ -10994,7 +11049,7 @@ NoSparkCarry:
 
 ;*ck_nextcyl:
 ;check for next cyl mode - only get here if NOT in long-trigger
-;*        brclr   nextcyl,EnhancedBits4,SDelayDone
+;*        brclr   nextcyl,EnhancedBits4,SDelayDone                ;* nextcyl = 0
 
 ;now actual delay = itime - "spark delay"
 ;i.e. if trigger = 10, advance = 17 -> want 7 degrees ahead of trigger
@@ -11010,12 +11065,12 @@ NoSparkCarry:
 ;*SDelayDone:
 
         brset   SparkHSpeed,SparkBits,set_spk_timer	; High speed set timer
-        brclr   dwellcont,feature7,j_SSC
+;*        brclr   dwellcont,feature7,j_SSC                         ;* dwellcont = 1
 ;if next_cyl and cranking then skip
-        brclr   nextcyl,EnhancedBits4,sdd2
-        brset   crank,engine,j_SSC   ; can cause a conflict
+;*        brclr   nextcyl,EnhancedBits4,sdd2                         ;* nextcyl = 0
+;*        brset   crank,engine,j_SSC   ; can cause a conflict
 
-sdd2:
+;*sdd2:
 ; low speed dwell
 ; a copy of some of Calcdwell, but simplified...
 
@@ -11042,8 +11097,9 @@ lsd_done2:
 ;*        brset   coildbit,coilsel,lsd_d
 ;*        brset   coilebit,coilsel,lsd_e
 ;*        brset   coilfbit,coilsel,lsd_f
-j_SSC:
-        jmp     SKIP_CYCLE_CALC
+
+;*j_SSC:
+;*        jmp     SKIP_CYCLE_CALC
 lsd_a:  sthx    SparkOnLeftah		; Store time to keep output the same
         jmp     SKIP_CYCLE_CALC
 lsd_b:  sthx    SparkOnLeftbh		; Store time to keep output the same
@@ -11058,9 +11114,9 @@ lsd_b:  sthx    SparkOnLeftbh		; Store time to keep output the same
 ;*        jmp     SKIP_CYCLE_CALC
 
 set_spk_timer:
-        brclr   dwellcont,feature7,do_set_spk
+;*        brclr   dwellcont,feature7,do_set_spk                ;* dwellcont = 1
 ;if next_cyl and cranking then skip
-;*        brclr   nextcyl,EnhancedBits4,sst2
+;*        brclr   nextcyl,EnhancedBits4,sst2                    ;* nextcyl = 0
 ;*        brset   crank,engine,do_set_spk   ; can cause a conflict
 ;*sst2:
 ; now see if we've time for dwell before spark
@@ -11130,6 +11186,7 @@ dwl_ok:
 ;*        brset   coilebit,coilsel,zd_e
 ;*        brset   coilfbit,coilsel,zd_f
         bra     do_set_spk		; how?
+
 zd_a:   sthx    SparkOnLeftah		; Store time to keep output the same
         bra     do_set_spk
 zd_b:   sthx    SparkOnLeftbh		; Store time to keep output the same
@@ -11144,7 +11201,7 @@ zd_b:   sthx    SparkOnLeftbh		; Store time to keep output the same
 
 do_set_spk:
         lda     SparkDelayL
-	sub     latency_f
+	sub     latency_f                                        ;* latency_f = 0
 	sta     SparkDelayL
 	lda     SparkDelayH
 	sbc     #0
@@ -11180,16 +11237,16 @@ setit2:
 
 	; rotary low revs ...
 
-;*	brclr	rotary2,EnhancedBits5,skip_rotary_jmp
+;*	brclr	rotary2,EnhancedBits5,skip_rotary_jmp             ;* rotary2 = 0
 ;*	brset	indwell,EnhancedBits4,do_rotary_dwl
 ;*skip_rotary_jmp:
-	jmp	SKIP_CYCLE_CALC
+;*	jmp	SKIP_CYCLE_CALC
 
 ;*do_rotary_dwl:
 ;*	brclr	rsh_s,EnhancedBits5,SKIP_CYCLE_CALC
 ;*	brclr	rsh_r,EnhancedBits5,SKIP_CYCLE_CALC
 
-	; Add rotary split to the SparkDelay
+;*	; Add rotary split to the SparkDelay
 
 ;*	lda	SparkDelayL
 ;*	add	splitdelL
@@ -11287,10 +11344,10 @@ w_dec_notlogt:
         bset      fuelp,porta		; Turn on fuel Pump
 ;scc_run:
         bset      running,engine	; Set engine running value
-;*        brclr     dwellcont,feature7,no_dwell
-        ;figure out if we want to schedule dwell now
-;;        brclr   crank,engine,bsc1	; we don't
-        ; if in crank mode then min_dwell does same thing
+;*        brclr     dwellcont,feature7,no_dwell              ;* dwellcont = 1
+;*        ;figure out if we want to schedule dwell now
+;*;;        brclr   crank,engine,bsc1	; we don't
+;*        ; if in crank mode then min_dwell does same thing
         jmp       squirtCheck1
 
 ;*no_dwell:
@@ -11316,7 +11373,7 @@ squirtCheck1:
         inc       IgnCount1		; Check to see if we are to
 					; squirt or skip
         lda       IgnCount1
-        cmp       divider_f1    ;* divider_f1 = 4T
+        cmp       divider_f1                               ;* divider_f1 = 4T
         beq       schedule1
         cmp       #16T			; The maximum allowed - reset if match
         blo       squirtDone1
@@ -11330,7 +11387,7 @@ schedule1:
  ;       bit       #alt_i2t2
  ;       bne       schedule1a		; i2t2=1
 
-;*        lda       alternate_f1
+;*        lda       alternate_f1                         ;* alternate_f1 = 1 (alternate)
 ;*        beq       schedule1a
         inc       altcount1
         brset     0,altcount1,squirtDone1
@@ -11345,7 +11402,7 @@ squirtDone1:
 
 squirtCheck2:
 ;*        lda       DTmode_f		; check if DT in use
-;*        bit       #alt_i2t2
+;*        bit       #alt_i2t2                             ;* alt_i2t2 = 0
 ;*        bne       sc2dual		; i2t2=1
 
 sc2single:
@@ -11355,7 +11412,7 @@ sc2single:
         inc       IgnCount2		; Check to see if we are to
 					; squirt or skip
         lda       IgnCount2
-        cmp       divider_f1     ;* divider_f1 = 4T
+        cmp       divider_f1                              ;* divider_f1 = 4T
         beq       schedule2s
         lda       IgnCount2
         cmp       #16T			; The maximum allowed - reset if match
@@ -11365,8 +11422,8 @@ sc2single:
 
 schedule2s:
         clr       IgnCount2
-        lda       alternate_f1       ;* alternate_f1 = 1 (alternate)
-        beq       schedule2sa
+;*        lda       alternate_f1                          ;* alternate_f1 = 1 (alternate)
+;*        beq       schedule2sa
         inc       altcount2
         brclr     0,altcount2,squirtDone2
 schedule2sa:
@@ -11383,7 +11440,7 @@ sc2dual:
         inc       IgnCount2		; Check to see if we are to
 					; squirt or skip
         lda       IgnCount2
-        cmp       divider_f2     ;* divider_f2 = 4T
+        cmp       divider_f2                              ;* divider_f2 = 4T
         beq       schedule2d
         lda       IgnCount2
         cmp       #16T			; The maximum allowed - reset if match
@@ -11393,8 +11450,8 @@ sc2dual:
 
 schedule2d:
         clr       IgnCount2
-        lda       alternate_f1   ;* alternate_f1 = 1 (alternate)
-        beq       schedule2da
+;*        lda       alternate_f1                          ;* alternate_f1 = 1 (alternate)
+;*        beq       schedule2da
         inc       altcount2
         brclr     0,altcount2,squirtDone2
 schedule2da:
@@ -11405,9 +11462,9 @@ schedule2da:
 
 squirtDone2:
 
-;*IRQ_EXIT:
-;*        brset     MSNEON,personality,IRQ_EXIT2
-;*        brset     WHEEL,personality,IRQ_EXIT2
+IRQ_EXIT:
+;*        brset     MSNEON,personality,IRQ_EXIT2           ;* MSNEON = 0
+;*        brset     WHEEL,personality,IRQ_EXIT2             ;* WHEEL = 1
 ;*        lda       feature6_f
 ;*        bit       #falsetrigb           ; can disable false trigger protection for testing
 ;*        bne       IRQ_EXIT2
@@ -11442,7 +11499,7 @@ ADCDONE:
 KPa_ADC_Check:
        	brclr   startw,engine,NormMAP_Count ; Are we in ASE mode?
 ;*        lda     feature10_f5
-;*        bit     #MAPHoldb           ; Are we holding the MAP at a fixed value during ASE?
+;*        bit     #MAPHoldb           ; Are we holding the MAP at a fixed value during ASE?   ;* MAPHoldb = 0 (Normal MAP)
 ;*        beq     NormMAP_Count
 ;*        brset   FxdASEDone,EnhancedBits4,NormMAP_Count  ; Is Fixed ASE done?
 
@@ -11619,9 +11676,9 @@ MODE_B_OK:
 
 ck_page0:
 ; Set up RAM Variable - also when burning page0 search for "burning page0"
-        lda     feature1_f
+        lda     feature1_f                                  ;* feature1_f = %01001000
         sta     feature1
-        lda     feature2_f
+        lda     feature2_f                                 ;* feature2_f = %00000000
         sta     feature2
 ;        lda     feature3_f
 ;        sta     feature3		; ram copy removed
@@ -11631,54 +11688,54 @@ ck_page0:
 ;        sta     feature5		; ram copy removed
 ;        lda     feature6_f
 ;        sta     feature6		; ram copy removed
-        lda     feature7_f
+        lda     feature7_f                                     ;* feature7_f = %00000010
         sta     feature7
 ;        lda     feature8_f
 ;        sta     feature8		; ram copy removed
-        lda     outputpins_f
+        lda     outputpins_f                                   ;* outputpins_f = %001100110
         sta     outputpins
-        lda     personality_f
+        lda     personality_f                                   ;* personality_f = %00000100
         sta     personality		; move from flash to ram
 
 ;is PTC4 (pin11) an input (trig2) or output (shiftlight)
-;*        brclr   wd_2trig,feature1,ckp0_norm_ddrc
+;*        brclr   wd_2trig,feature1,ckp0_norm_ddrc                ;* wd_2trig = 0
 ;*        lda     #%00001111              ; make PTC4 an input for second trigger
 ;*        bra     ckp0_ddrc
-ckp0_norm_ddrc:
+;*ckp0_norm_ddrc:
         lda     #%00011111		; ** Was 11111111
 ckp0_ddrc:
         sta     ddrc			; Outputs for LED
 
 ;decide if we are doing multiple wasted spark outputs
 ;check this here so a changed setting or MSQ load will correctly init the variables
-;*        brset   MSNEON,personality,pz_wspk
-;*        brset   WHEEL,personality,pz_wspk
+;*        brset   MSNEON,personality,pz_wspk                        ;* MSNEON = 0
+;*        brset   WHEEL,personality,pz_wspk                           ;* WHEEL = 1
 ;*pz_nwspk:
 ;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing wasted spark
 ;*        bra     DONE_B
 ;*pz_wspk:
-;*        brclr   REUSE_LED19,outputpins,pz_nwspk
-;*        brset   rotary2,EnhancedBits5,pz_nwspk
+;*        brclr   REUSE_LED19,outputpins,pz_nwspk                   ;* REUSE_LED19 = 1
+;*        brset   rotary2,EnhancedBits5,pz_nwspk                     ;* rotary2 = 0
         bset    wspk,EnhancedBits4	; set that we are doing wasted spark
         bra     DONE_B
 
 ck_page3:
 ;see if inverted or non-inv output and use a quick bit
 ;*        lda     SparkConfig1_f		; check if noninv or inv spark
-;*        bit     #M_SC1InvSpark      ;* M_SC1InvSpark = 1
+;*        bit     #M_SC1InvSpark                                    ;* M_SC1InvSpark = 1
 ;*        bne     ckp3_inv
 ;*        bclr    invspk,EnhancedBits4	; set non-inverted
 ;*        bra     ckp3_i_done
-ckp3_inv:
+;*ckp3_inv:
         bset    invspk,EnhancedBits4	; set inverted
 ckp3_i_done:
 
 
 ;EDIS and NEON are never next-cylinder
-;*        brset   EDIS,personality,not_nc
-;*        brset   MSNEON,personality,not_nc
+;*        brset   EDIS,personality,not_nc                ;* EDIS = 0
+;*        brset   MSNEON,personality,not_nc               ;* MSNEON = 0
 
-;*        lda     TriggAngle_f
+;*        lda     TriggAngle_f                            ;* TriggAngle_f = 227T (80 degrees)
 ;*        cmp     #57T			; check for next cyl mode
 ;*        bhi     not_nc		; trigger angle > 20, continue
 ;*        bset    nextcyl,EnhancedBits4
@@ -11689,7 +11746,7 @@ ckp3_i_done:
 
 ck_page7:
 ;*        lda     p8feat1_f
-;*        bit     #rotary2b
+;*        bit     #rotary2b                                        ;* rotary2b = 0
 ;*        beq     ckp7nr
 ;*        bset    rotary2,EnhancedBits5
 ;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing normal wasted spark
@@ -11918,49 +11975,49 @@ inac_cont:
         brclr   mv_mode,EnhancedBits2,Send_Data_Normal	; Yes so are we in
 					; MV mode?
 
-;*        lda     config11_f1
-;*        and     #$03
-;*        cbeqa   #2T,kpa300_reading
-;*        cbeqa   #3T,kpa400_reading
+        lda     config11_f1
+        and     #$03
+        cbeqa   #2T,kpa300_reading
+        cbeqa   #3T,kpa400_reading
         bra     send_data_normal
 
-;*kpa300_reading:
+kpa300_reading:
 ; If we are here we are using a 300KPa sensor and we have a MV connected,
 ; so send 86% of the raw map value to MV so it converts it correctly
-;*        lda     kpa
-;*        cmp     #217T
-;*        bhi     Load_Max_Map		; If raw map > 217 then we are
+        lda     kpa
+        cmp     #217T
+        bhi     Load_Max_Map		; If raw map > 217 then we are
 					; above 255KPa, thats the limit in MV
-;*        tax
-;*        lda     #219T			; 86% = 219 in 255 bytes
-;*        mul
-;*        txa
-;*        bcc     Send_Fudged_Data
-;*        inca
-;*        bra     Send_Fudged_Data
+        tax
+        lda     #219T			; 86% = 219 in 255 bytes
+        mul
+        txa
+        bcc     Send_Fudged_Data
+        inca
+        bra     Send_Fudged_Data
 
 IN_Q_MODEJMP:
         bra    IN_Q_MODE
 
 ; If we get here we are using a 400KPa sensor and we have a MV connected,
 ; so send 63% of the raw map value to MV
-;*KPa400_Reading:
-;*        lda     kpa
-;*        cmp     #159T
-;*        bhi     Load_Max_Map		; If raw map > 159 then we are
+KPa400_Reading:
+        lda     kpa
+        cmp     #159T
+        bhi     Load_Max_Map		; If raw map > 159 then we are
 					; above 255KPa, the limit in MV
-;*        tax
-;*        lda     #160T
-;*        mul
-;*        txa
-;*        bcc     Send_Fudged_Data
-;*        inca
-;*        bra     Send_Fudged_Data
+        tax
+        lda     #160T
+        mul
+        txa
+        bcc     Send_Fudged_Data
+        inca
+        bra     Send_Fudged_Data
 
-;*Load_Max_Map:
-;*        lda     #255T			; Load in KPa limit
-;*Send_Fudged_Data:
-;*        bra     CONT_TX
+Load_Max_Map:
+        lda     #255T			; Load in KPa limit
+Send_Fudged_Data:
+        bra     CONT_TX
 
 
 Send_Data_Normal:
@@ -11973,8 +12030,8 @@ send_ports:
         lda     porta,X			; load porta,b,c,d 31=a, 34=d
         cpx     #2
         bne     CONT_TX
-;*        brclr   config_error,feature2,CONT_TX
-;*        ora     #128T   ; set top bit in portc if config error
+        brclr   config_error,feature2,CONT_TX
+        ora     #128T   ; set top bit in portc if config error
         bra     CONT_TX
 IN_V_MODE
         lda     page
@@ -12672,23 +12729,23 @@ ExitSN:
 ;*StoreNos:
 ;*         sta    NitrousAngle		; Store the Angle to retard by for NOS
 ;*Nos_Lin:
-***************************************************************************
-**
-**  Linear Interpolation - for finding PW for NOS.
-**  Added this as using the original screwed the Spark Angle up.     (P. Ringwood)
-**  Ripped off from the original.
-**
-**            (y2 - y1)
-**  Y = Y1 +  --------- * (x - x1)
-**            (x2 - x1)
-**
-**   3000rpm      = x1
-**   NosRpmMax    = x2
-**   NosFuelLo    = y1
-**   NosFuelHi    = y2
-**   rpm          = x
-**   NosPW        = y
-***************************************************************************
+;***************************************************************************
+;**
+;**  Linear Interpolation - for finding PW for NOS.
+;**  Added this as using the original screwed the Spark Angle up.     (P. Ringwood)
+;**  Ripped off from the original.
+;**
+;**            (y2 - y1)
+;**  Y = Y1 +  --------- * (x - x1)
+;**            (x2 - x1)
+;**
+;**   3000rpm      = x1
+;**   NosRpmMax    = x2
+;**   NosFuelLo    = y1
+;**   NosFuelHi    = y2
+;**   rpm          = x
+;**   NosPW        = y
+;***************************************************************************
 ;*        clr     tmp7			; This is the negative slope
 					; detection bit
 ;*        lda     NosFuelLo_f		; Store the minimum PW incase
@@ -12726,7 +12783,7 @@ ExitSN:
 ;*        psha
 ;*        lda     rpm
 ;*        sub     NosRpm_f		; Find out difference in rpm and
-					; min setpoint
+;*					; min setpoint
 ;*        beq     ZERO_Interpole
 ;*        pulx
 ;*        mul
@@ -12755,7 +12812,7 @@ ExitSN:
 ;*        bra     End_Interpole
 ;*ZERO_Interpole:
 ;*        pula				;clean stack
-;*;*        pula				;clean stack
+;*        pula				;clean stack
 ;*End_Interpole:
 
 ; Check if weve hit 90% Duty Cycle with NOS PW
@@ -12800,9 +12857,9 @@ ExitSN:
 
 ;*         rts
 
-******************************************************************************
-**        Check if were ready to use VE Table 3
-******************************************************************************
+;******************************************************************************
+;**        Check if were ready to use VE Table 3
+;******************************************************************************
 
 ;*Check_VE3_Table:
 ;*        brclr   Nitrous,feature1,Check_VE3_NOS	; Are we using NOS?
@@ -12825,39 +12882,39 @@ ExitSN:
 **    AFR Table 1 is for VE table 1   AFR Table 2 is for VE table 3        ***
 ******************************************************************************
 AFR1_Targets:
-;*        brset   useVE3,EnhancedBits,No_AFR_ForVE1	; If were running
+        brset   useVE3,EnhancedBits,No_AFR_ForVE1	; If were running   ;* useVE3 = 0
 					; VE3 then no need to go any further
         lda     EGOcount		; Are we about to check the ego?
         cmp     EGOcountcmp_f
         beq     Do_Targets		; If yes then get the target from
 					; the table
-;*No_AFR_ForVE1:
-;*        rts				; If No then return, this saves
+No_AFR_ForVE1:
+        rts				; If No then return, this saves
 					; wasting time.
 
 Do_Targets:				; VE 1 Targets from AFR Table 1
-;*        brclr   TPSTargetAFR,feature7,NO_TPS_SetAFR1	; Have we selected
-;*					; to go to targets above tps setpoint?
-;*        lda     tps
-;*        cmp     AFRTarTPS_f
-;*        bhi     NO_TPS_SetAFR1		; If tps higher than setpoint then
+        brclr   TPSTargetAFR,feature7,NO_TPS_SetAFR1	; Have we selected
+					; to go to targets above tps setpoint?
+        lda     tps
+        cmp     AFRTarTPS_f
+        bhi     NO_TPS_SetAFR1		; If tps higher than setpoint then
 					; do tables
-;*        lda     O2targetV_f		; If not load in target from
+        lda     O2targetV_f		; If not load in target from
 					; enrichments page
-;*        sta     afrTarget
-;*        rts
+        sta     afrTarget
+        rts
 
 NO_TPS_SetAFR1:
         clrh
         clrx
-;*        brset   AlphaTarAFR,feature7,AFR1_AN	; Have we selected to use
+        brset   AlphaTarAFR,feature7,AFR1_AN	; Have we selected to use
 					; tps for target afrs instead of kpa?
 
         lda     kpa                     ; Normal Speed density
-;*        bra     AFR1_STEP_1
+        bra     AFR1_STEP_1
 
-;*AFR1_AN:
-;*        lda     tps
+AFR1_AN:
+        lda     tps
 
 AFR1_STEP_1:
         sta     kpa_n
@@ -12913,9 +12970,9 @@ AFR1_STEP_3:
         mov     tmp6,afrTarget
         rts
 
-*****************************************************************************
-**             VE 3 Targets from AFR Table 2
-*****************************************************************************
+;*****************************************************************************
+;**             VE 3 Targets from AFR Table 2
+;*****************************************************************************
 ;*AFR2_Targets:
 ;*        brclr   useVE3,EnhancedBits,No_AFR_ForVE3	; If were not running
 					;VE3 then no need to go any further
@@ -13087,7 +13144,7 @@ WWURANGE:
 
 
 REVNUM: db      00T			; not used, always zero
-textversion_f:   db   'MS1/Extra rev 029y4 Mex 7 16 23*' ; full code release  ;* 'MS1/Extra rev 029y4 ************'
+textversion_f:   db   'MS1/Extra rev 029y4 MexACVW ****' ; full code release
 Signature:       db   'MS1/Extra format 029y3 *********' ; data format for
                  ; ini file matching, ONLY change this if the data format changed.
 ;must be 32 chars     '12345678901234567890123456789012' ; (may change to 20)
@@ -13162,15 +13219,15 @@ end_of_main:   ; check this var to ensure it does not exceed $DFFF
 ;------------------------------------------------------------------
 ; Lookup Tables
         org     $F000
-;*        include "barofactor300k.inc"
+        include "barofactor300k.inc"
         include "barofactor4115.inc"
         include "barofactor4250.inc"
         include "kpafactor4115.inc"
         include "kpafactor4250.inc"
         include "thermfactor.inc"
         include "airdenfactor.inc"
-;*        include "matfactor.inc"
-;*        include "barofactor400k.inc"
+        include "matfactor.inc"
+        include "barofactor400k.inc"
     ; Room here for no more inc file
 ;------------------------------------------------------------------
        org     $E000
@@ -13180,7 +13237,7 @@ end_of_main:   ; check this var to ensure it does not exceed $DFFF
 
 flash_table0:  ; config variables
 
-personality_f   db      %00000001	; Only 1 allowed to be set unless in
+personality_f   db      %00000100	; Only 1 allowed to be set unless in
 					; EDIS or WHEEL mode, if all are set
 					; to 0 then thats fuel only (std MS)!
 ;MSNS           equ      1    Megasquirtnspark
@@ -13193,7 +13250,7 @@ personality_f   db      %00000001	; Only 1 allowed to be set unless in
 ;TFI            equ      $40  Ford TFI system
 ;HEI7           equ      $80  GM 7 pin HEI
 
-outputpins_f    db      %00000110
+outputpins_f    db      %00110010
 ;               bits=    76543210
 ;       equ 1       FIDLE for Idle Air Valve || spark output (as per MSnS)
 ;       equ 2       LED17 for squirt led     || coila output
@@ -13237,7 +13294,7 @@ Out2Lim		db      0T	; Output 2 limit As out1Lim
 
 Out2Source	db      0T	; Same as Out1Source
 
-feature1_f	db      %01000010
+feature1_f	db      %01001000
 ;wd_2trig       equ 1     wheel decoder 2nd trigger i/p - new in 023c9
 ;               spare
 ;whlsim         equ 4     Wheel simulator          off      on
@@ -13281,12 +13338,12 @@ NosRpm_f	db      30T	; Nitrous System Min RPM * 100, 3000rpm is
 NosRpmMax_f	db      60T	; Nitrous Max RPM *100 (used for
 				; interpolating and cutting nos)
 
-Trig1_f		db       0T	; wheel decoding
-Trig2_f		db       0T	;  "
+Trig1_f		db       1T	; wheel decoding
+Trig2_f		db       19T	;  "
 Trig3_f		db       0T	;  "
 Trig4_f		db       0T	;  "
-Trig1ret_f	db       0T	;  "
-Trig2ret_f	db       0T	;  "
+Trig1ret_f	db       8T	;  "
+Trig2ret_f	db       28T	;  "
 Trig3ret_f	db       0T	;  "
 Trig4ret_f	db       0T	;  "
 
@@ -13319,7 +13376,7 @@ Over_B_P_f	db      0T	; Over boost Protection KPa setpoint
 SparkCutNum_f	db      3T	; Rev Limiter Hard cut spark cut number to
 				; remove sparks from SparkCutBase_f
 
-feature3_f	db      %00110000  ; (46)
+feature3_f	db      %10110001  ; (46)
 KPaTpsOpenb      equ 1
 VarLaunchb       equ 2
 CltIatIgnitionb  equ 4
@@ -13356,8 +13413,8 @@ KnockTim_f	db      01T     ; Timer for steps of knock advance / retard
 iatpoint_f	db      100T    ; Water Inj IAT setpoint point F -40 (61)
 wateripoint_f	db      120T    ; Water Injection KPa setpoint
 wateriRpm_f	db      35T     ; Water Injection RPM setpoint RPM*100
-kpaO2_f		db      80T     ; KPa Open loop setpoint for no O2 correction
-tpsO2_f		db      192T    ; TPS Open Loop setpoint for no O2 correction Raw ADC
+kpaO2_f		db      120T     ; KPa Open loop setpoint for no O2 correction
+tpsO2_f		db      255T    ; TPS Open Loop setpoint for no O2 correction Raw ADC
 
 feature4_f	db      %00000000; Another feature bit for enhanced (66)
 miss2ndb         equ 1 ; Missing tooth AND 2nd trigger
@@ -13385,7 +13442,7 @@ EfanOnTemp_f	db      234T    ; X2 or LED 17 electric fan output on temp
 EfanOffTemp_f	db      185T    ; X2 or LED 17 electric fan output off temp
 				; F-40
 
-feature5_f	db      %00110011  ; Yet another feature bit (76)
+feature5_f	db      %00011011  ; Yet another feature bit (76)
 Fuel_SparkHLCb   equ 1  ; Fuel or Spark cut for Launch
 FuelSparkLCb     equ 2  ; Fuel or Spark cut for Launch
 stagedb:         equ 4  ; Roger Enns Staged Mode   xxxx00xx = Staged Off  xxxx01xx = RPM Based
@@ -13409,8 +13466,8 @@ STGTRANS_f	db      25T	; Staged transition point, rpm*100, kpa,
 				; method selected (See feature5_f bits 3-4)
 STGDELTA_f	db      03T	; Staged operation off at (STGTRANS-STGDELTA)
 				; so this is raw data as STGTRANS
-BarroHi_f	db      110T	; Barometric Correction Max Limit in KPa (82)
-BarroLow_f	db      60T	; Barometric Correction Lower Limit in KPa
+BarroHi_f	db      116T	; Barometric Correction Max Limit in KPa (82)
+BarroLow_f	db      67T	; Barometric Correction Lower Limit in KPa
 SparkCutBNum_f	db      03T	; Number of sparks to remove from BASE value
 				; when Over Boost
 NosLowKpa_f	db      80T	; Minimum KPa to fire Nos Anti-lag
@@ -13422,7 +13479,7 @@ Out1UpLim_f	db      00T	; Output 1 top limit for window, so output1
 				; will go off above this value unless its 0
 				; then its ignored
 Out2UpLim_f	db      00T	; Output 2 top limit for window (89)
-NumTeeth_f	db      12T	; Number of teeth for wheel decoder
+NumTeeth_f	db      36T	; Number of teeth for wheel decoder
 MAPThresh_f	db      30T	; MAP dot threshold for Accel Decel
 				; Enrichments *10 (KPa/Sec)
 
@@ -13498,8 +13555,8 @@ feature7_f	db      %00000010  ; More feature bits     (109)
 ;spare	equ $40
 ;spare	equ $80
 
-dwellcrank_f	db       60T	; cranking dwell in 0.1ms
-dwellrun_f	db       40T	; running  dwell in 0.1ms  (111)
+dwellcrank_f	db       45T	; cranking dwell in 0.1ms
+dwellrun_f	db       30T	; running  dwell in 0.1ms  (111)
 
 TractCycle_f:
 	db      03T		; Engine cycles to hold enrichment /
@@ -13576,7 +13633,7 @@ mindischg_f	db      05T	; minimum discharge period for dwell
 
 ;pwm idle was here
 
-tachconf_f      db      0T      ; tach output config (159)
+tachconf_f      db      4T      ; tach output config (159)
 Trig5_f		db       0T	; wheel decoding (160)
 Trig6_f		db       0T	;  "
 Trig5ret_f	db       0T	;  "
@@ -13601,15 +13658,15 @@ xxKPaCorr300_f db    00T     ; KPa correction factor for 400/300KPa sensor (175)
 
 
 tpsdotrate:
-	db	05T		; These next 4 are delta points for TPSdot
+	db	10T		; These next 4 are delta points for TPSdot
 				; V/Sec
 				; these were hard coded points, now users can
 				; select what values
 				; they want where. *0.1960784 MAX=25.5
-	db	20T		; So 40 = 0.8V/0.1Sec or 8V/Sec as we check it
+	db	39T		; So 40 = 0.8V/0.1Sec or 8V/Sec as we check it
 				; every 0.1Sec
-	db	40T		;
-	db	77T		; (179)
+	db	78T		;
+	db	150T		; (179)
 mapdotrate_f:
 	db	05T		; These next 4 are delta points for MAPdot
 				; KPa/Sec *10 so 255=2550KPa/Sec as we check it
@@ -13675,67 +13732,67 @@ flash_table0_end:                ;marker for easy lookup in lst file
         org     $E100
 flash_table1:           ; FUEL 1   12x12 Total Bytes = 144
 VE_f1:
-	db      39T,40T,41T,44T,44T,44T,45T,45T,45T,46T,47T,50T ; VE(0,0-11)
-	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (1,0-11)
-	db      47T,47T,51T,51T,50T,50T,50T,50T,51T,55T,56T,60T ; VE (2,0-11)
-	db      52T,55T,55T,57T,60T,61T,61T,65T,67T,70T,72T,75T ; VE (3,0-11)
-	db      52T,55T,55T,57T,60T,61T,61T,65T,67T,70T,72T,75T ; VE (4,0-11)
-	db      59T,60T,60T,65T,66T,70T,70T,70T,72T,74T,77T,80T ; VE (5,0-11)
-	db      61T,63T,65T,65T,68T,70T,72T,75T,77T,80T,84T,85T ; VE (6,0-11)
-	db      65T,72T,72T,74T,74T,75T,75T,77T,79T,83T,89T,90T ; VE (7,0-11)
-	db      70T,74T,74T,75T,75T,77T,77T,78T,82T,86T,95T,95T ; VE (8,0-11)
-	db      70T,74T,74T,75T,75T,77T,77T,78T,82T,86T,95T,95T ; VE (9,0-11)
-	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (10,0-11)
-	db      75T,77T,79T,73T,82T,82T,82T,85T,87T,89T,99T,100T; VE (11,0-11)
+	db      42T,41T,41T,39T,41T,42T,42T,42T,42T,42T,42T,42T ; VE(0,0-11)
+	db      43T,43T,42T,39T,41T,42T,42T,42T,42T,42T,42T,42T ; VE (1,0-11)
+	db      46T,45T,44T,44T,44T,44T,44T,45T,46T,46T,46T,46T ; VE (2,0-11)
+	db      58T,53T,46T,46T,47T,48T,49T,49T,49T,49T,49T,49T ; VE (3,0-11)
+	db      74T,61T,53T,51T,52T,53T,55T,56T,57T,58T,59T,59T ; VE (4,0-11)
+	db      82T,63T,55T,52T,53T,55T,56T,57T,59T,59T,60T,60T ; VE (5,0-11)
+	db      82T,68T,59T,56T,57T,59T,60T,63T,63T,63T,63T,63T ; VE (6,0-11)
+	db      82T,74T,63T,58T,59T,60T,62T,63T,63T,63T,63T,63T ; VE (7,0-11)
+	db      82T,77T,66T,66T,66T,67T,68T,66T,63T,63T,63T,63T ; VE (8,0-11)
+	db      83T,84T,86T,86T,86T,85T,84T,85T,89T,90T,95T,100T ; VE (9,0-11)
+	db      83T,84T,87T,88T,89T,91T,92T,94T,94T,94T,96T,100T ; VE (10,0-11)
+	db      84T,84T,87T,88T,89T,91T,92T,94T,96T,97T,98T,100T ; VE (11,0-11)  ;* 143
 
 EGOTEMP_f	db      200T	; EGOTEMP
 EGOCOUNTCMP_f	db      16T	; EGOCOUNTCMP
-EGODELTA_f	db      1T	; EGODELTA
+EGODELTA_f	db      0T	; EGODELTA
 EGOLIMIT_f	db      15T	; EGOLIMIT
 REQ_FUEL_f1	db      155T	; REQFUEL (148)
 DIVIDER_f1	db      4T	; DIVIDER
-Alternate_f1	db      0	; alternate or simult (single table ONLY)
-INJOPEN_f1	db      10T	; INJOPEN
+Alternate_f1	db      1	; alternate or simult (single table ONLY)
+INJOPEN_f1	db      9T	; INJOPEN
 INJOCFUEL_f1	db      0T	; INJOCFUEL  NOT USED NOW !!!!!
 				; Kept to fill hole
 INJPWM_f1	db      75T	; INJPWM
 INJPWMT_f1	db      255T	; INJPWMT
-BATTFAC_f1	db      12T	; BATTFAC
-rpmk_f1		db      $05	; RPMK[0]
-		db      $DC	; RPMK[1]
+BATTFAC_f1	db      20T	; BATTFAC
+rpmk_f1		db      11T	; RPMK[0]
+		db      184T	; RPMK[1]
 RPMRANGEVE_f1:
 	db      5T		; RPMRANGEVE[0]
-	db      10T		; RPMRANGEVE[1]
-	db      15T		; RPMRANGEVE[2]
-	db      20T		; RPMRANGEVE[3]
-	db      28T		; RPMRANGEVE[4]
-	db      36T		; RPMRANGEVE[5]
-	db      44T		; RPMRANGEVE[6]
-	db      52T		; RPMRANGEVE[7]
-	db      55T		; RPMRANGEVE[8]
-	db      60T		; RPMRANGEVE[9]
-	db      62T		; RPMRANGEVE[10]
-	db      65T		; RPMRANGEVE[11]
+	db      9T		; RPMRANGEVE[1]
+	db      12T		; RPMRANGEVE[2]
+	db      16T		; RPMRANGEVE[3]
+	db      20T		; RPMRANGEVE[4]
+	db      23T		; RPMRANGEVE[5]
+	db      27T		; RPMRANGEVE[6]
+	db      30T		; RPMRANGEVE[7]
+	db      34T		; RPMRANGEVE[8]
+	db      38T		; RPMRANGEVE[9]
+	db      41T		; RPMRANGEVE[10]
+	db      45T		; RPMRANGEVE[11]
 KPARANGEVE_f1:
 	db      20T		; KPARANGEVE[0]
-	db      30T		; KPARANGEVE[1]
-	db      40T		; KPARANGEVE[2]
-       	db      50T		; KPARANGEVE[3]
-	db      60T		; KPARANGEVE[4]
-	db      75T		; KPARANGEVE[5]
-	db      90T		; KPARANGEVE[6]
-	db      100T		; KPARANGEVE[7]
-	db      110T		; KPARANGEVE[8]
-	db      120T		; KPARANGEVE[9]
-	db      130T		; KPARANGEVE[10]
-	db      150T		; KPARANGEVE[11]
+	db      27T		; KPARANGEVE[1]
+	db      35T		; KPARANGEVE[2]
+    db      42T		; KPARANGEVE[3]
+	db      49T		; KPARANGEVE[4]
+	db      56T		; KPARANGEVE[5]
+	db      64T		; KPARANGEVE[6]
+	db      71T		; KPARANGEVE[7]
+	db      78T		; KPARANGEVE[8]
+	db      85T		; KPARANGEVE[9]
+	db      93T		; KPARANGEVE[10]
+	db      100T		; KPARANGEVE[11]
 
-config11_f1	db      113T	; Config11 (originally 113T for 8 cyl) (182)
-config12_f1	db      112T	; Config12 (originally 112T for 8 injectors)
-config13_f1	db      00T	; Config13
+config11_f1	db      49T	; Config11 (originally 113T for 8 cyl) (182)
+config12_f1	db      58T	; Config12 (originally 112T for 8 injectors)
+config13_f1	db      10T	; Config13
 
-EGOrpm_f	db      13T	; RPMOXLIMIT
-FASTIDLEbg_f	db      234T	;
+EGOrpm_f	db      60T	; RPMOXLIMIT
+FASTIDLEbg_f	db      200T	;
 O2targetV_f	db      26T	; VOLTOXTARGET (187)
 feature14_f1    db      %00000000  ; (188)  ; allows EGOigncount to be on page1
 egoIgnCountb	equ 1           ;EGO Step Counter         mSecs || Ignition Pulses^
@@ -13800,37 +13857,38 @@ flash_table2_end:
         org     $E300
 flash_table3:           	; SPARK Table 1
 ST_f1: 				; *0.352 -28.4 Min -10  Max 80
-	db    53T,53T,58T,70T,90T,119T,131T,131T,131T,131T,131T,131T ;(0,0-11)
-	db    53T,53T,58T,70T,87T,113T,119T,119T,119T,119T,119T,119T ;(1,0-11)
-	db    58T,58T,64T,70T,84T,107T,113T,113T,113T,113T,113T,113T ;(2,0-11)
-	db    58T,58T,64T,70T,81T,104T,107T,107T,107T,107T,107T,107T ;(3,0-11)
-	db    58T,58T,64T,70T,81T,93T,101T,101T,101T,101T,101T,101T  ;(4,0-11)
-	db    58T,58T,64T,70T,81T,93T,101T,101T,101T,101T,101T,101T  ;(5,0-11)
-	db    58T,58T,64T,70T,81T,93T,101T,101T,101T,101T,101T,101T  ;(6,0-11)
-	db    58T,58T,64T,70T,81T,93T,101T,101T,101T,101T,101T,101T  ;(7,0-11)
-	db    58T,58T,61T,67T,78T,90T,98T,98T,98T,98T,98T,98T        ;(8,0-11)
-	db    58T,58T,58T,64T,75T,87T,95T,95T,95T,95T,95T,95T        ;(9,0-11)
-	db    58T,58T,55T,61T,72T,84T,92T,92T,92T,92T,92T,92T        ;(a,0-11)
-	db    58T,58T,51T,58T,69T,81T,81T,81T,81T,81T,81T,81T        ;(b,0-11) (143)
+	db    85T,91T,94T,99T,105T,111T,114T,116T,122T,122T,122T,122T ;(0,0-11)
+	db    85T,91T,94T,99T,105T,111T,114T,116T,122T,122T,122T,122T ;(1,0-11)
+	db    85T,91T,94T,99T,105T,111T,114T,116T,122T,122T,122T,122T ;(2,0-11)
+	db    85T,91T,94T,99T,105T,111T,114T,116T,122T,122T,122T,122T ;(3,0-11)
+	db    85T,91T,94T,99T,105T,111T,114T,116T,122T,122T,122T,122T ;(4,0-11)
+	db    82T,85T,88T,94T,99T,102T,108T,114T,119T,119T,119T,119T  ;(5,0-11)
+	db    68T,82T,82T,88T,94T,99T,105T,108T,114T,114T,114T,114T   ;(6,0-11)
+	db    74T,68T,68T,82T,88T,94T,99T,105T,111T,111T,111T,111T    ;(7,0-11)
+	db    68T,71T,74T,80T,85T,88T,94T,102T,108T,108T,108T,108T    ;(8,0-11)
+	db    65T,65T,65T,74T,80T,82T,88T,99T,105T,105T,105T,105T     ;(9,0-11)
+	db    62T,62T,62T,68T,74T,80T,85T,94T,99T,99T,99T,99T         ;(a,0-11)
+	db    57T,57T,57T,62T,68T,74T,80T,91T,97T,97T,97T,97T         ;(b,0-11) (143)
 
 RPMRANGEST_f1:
-	db      05T,07T,13T,20T,30T,40T,50T,60T,61T,62T,63T,64T
+	db      05T,09T,12T,16T,20T,23T,27T,30T,34T,38T,41T,45T    ;* 144 Tuner Studio rpmBins3
+
 				; RPMRANGEST[0-11]
 
 KPARANGEST_f1:
-	db      30T,40T,50T,60T,70T,80T,90T,100T,110T,120T,130T,140T  ; (last byte 167)
+	db      20T,27T,35T,42T,49T,56T,64T,71T,78T,85T,93T,100T  ;(last byte 167) ;* 156 Tuner Studio mapBins3
 				; KPARANGEST[0-b]
 
 ;; org $d3a8  ; stick them up out of the way at known values
-TriggAngle_f	db      171T	; TriggAngle (60 deg)     (168)  *0.352
+TriggAngle_f	db      227T	; TriggAngle (60 deg)     (168)  *0.352
 FixedAngle_f	db      0T	; FixedAngle   *0.352  -28.4   min -10 Max 80
 				; THIS MUST BE -10 (0) for non fixed angle
 TrimAngle_f	db      0T	; TrimAngle (NOT cleared on startup)  *0.352
 CrankAngle_f	db      56T	; Cranking advance (10deg)  *0.352 -28.4
 				;  min -10 max 80
-SparkHoldCyc_f	db      1T	; SparkHoldCyc (hold spark x cycles on
+SparkHoldCyc_f	db      0T	; SparkHoldCyc (hold spark x cycles on
 				; stall and restart)
-SparkConfig1_f	db   %00001100	; SparkConfig1 (Normal trigger, trigger
+SparkConfig1_f	db   %00001000	; SparkConfig1 (Normal trigger, trigger
 				; return based low speed spark) Standard MSnS
        ; 029g changed default, was %00000100 for non-inverted spark output after re-flash
 ;Sparkconfig1 equates
@@ -13881,7 +13939,7 @@ RPMRANGEST_f2:
 				; RPMRANGEST[0-b]
 
 KPARANGEST_f2:
-        db      30T,40T,50T,60T,70T,80T,90T,100T,110T,120T,130T,140T						; KPARANGEST[0-b]
+        db      30T,40T,50T,60T,70T,80T,90T,100T,110T,120T,130T,140T	; KPARANGEST[0-b]
 
 flash_table4_end:
 
@@ -13958,33 +14016,33 @@ flash_table5_end:
         org     $E600
 flash_table6:		; AFR Table 1 - 8x8 AFR targets for VE table 1
 AFR_f1:			; This is in RAW ADC so 255 = 5V from O2 sensor
-	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (0,0-7)
-	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (1,0-7)
-	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (2,0-7)
-	db      147T,147T,147T,147T,147T,147T,147T,147T; AFR (3,0-7)
-	db      130T,130T,130T,130T,130T,130T,130T,130T; AFR (4,0-7)
-	db      125T,125T,125T,125T,125T,125T,125T,125T; AFR (5,0-7)
-	db      125T,125T,125T,125T,125T,125T,125T,125T; AFR (6,0-7)
-	db      120T,120T,120T,120T,120T,120T,120T,120T; AFR (7,0-7)
+	db      130T,130T,160T,160T,160T,160T,160T,160T; AFR (0,0-7)      ;* 0 Tuner Studio afrBins1
+	db      130T,130T,160T,160T,160T,160T,160T,160T; AFR (1,0-7)
+	db      130T,130T,160T,160T,160T,160T,160T,160T; AFR (2,0-7)
+	db      130T,130T,160T,160T,160T,160T,160T,160T; AFR (3,0-7)
+	db      130T,130T,160T,160T,160T,160T,160T,160T; AFR (4,0-7)
+	db      130T,130T,150T,149T,144T,144T,144T,144T; AFR (5,0-7)
+	db      130T,130T,140T,138T,132T,132T,132T,132T; AFR (6,0-7)
+	db      130T,130T,130T,127T,125T,125T,125T,125T; AFR (7,0-7)
 
 RPMRANGEAFR_f1:
 	db      5T	; RPMRANGEAFR1[0]
-	db      10T	; RPMRANGEAFR1[1]
-	db      15T	; RPMRANGEAFR1[2]
-	db      20T	; RPMRANGEAFR1[3]
+	db      11T	; RPMRANGEAFR1[1]
+	db      16T	; RPMRANGEAFR1[2]
+	db      22T	; RPMRANGEAFR1[3]
 	db      28T	; RPMRANGEAFR1[4]
-	db      36T	; RPMRANGEAFR1[5]
-	db      50T	; RPMRANGEAFR1[6]
-	db      60T	; RPMRANGEAFR1[7]
+	db      34T	; RPMRANGEAFR1[5]
+	db      39T	; RPMRANGEAFR1[6]
+	db      45T	; RPMRANGEAFR1[7]
 KPARANGEAFR_f1:
-	db      15T	; KPARANGEAFR1[0]
-	db      30T	; KPARANGEAFR1[1]
-	db      50T	; KPARANGEAFR1[2]
-	db      60T	; KPARANGEAFR1[3]
-	db      90T	; KPARANGEAFR1[4]
-	db      100T	; KPARANGEAFR1[5]
-	db      110T	; KPARANGEAFR1[6]
-	db      150T	; KPARANGEAFR1[7]
+	db      20T	; KPARANGEAFR1[0]
+	db      31T	; KPARANGEAFR1[1]
+	db      43T	; KPARANGEAFR1[2]
+	db      54T	; KPARANGEAFR1[3]
+	db      65T	; KPARANGEAFR1[4]
+	db      77T	; KPARANGEAFR1[5]
+	db      88T	; KPARANGEAFR1[6]
+	db      100T	; KPARANGEAFR1[7]
 
              		; AFR Table 2 - 8x8 AFR targets for VE table 3
 			; (VE3) used when input switched low if selected
@@ -14126,7 +14184,7 @@ idlePeriod2_f   db      10T     ; rmd
 irestorerpm_f   db      15T     ; rmd
 idleclosedc_f   db      0T      ; rmd (015)
 
-feature13_f      db      2T
+feature13_f      db      3T
 PWMidleb         equ $01  ; pwm idle on vs B&G on/off
 idle_warmupb     equ $02  ; pwm idle warmup open loop
 idle_clb         equ $04  ; pwm idle closed loop
@@ -14135,39 +14193,39 @@ CltMATCheckb:    equ $10   ; Correction table MAT or IAT based
 
 FASTIDLEtemp_f	db      105T	; Feilding 2-Wire Idle control Fast Idle
 				; lower temperature F -40
-slowIdleTemp_f	db      234T	; Feilding 2-Wire Idle control Slow Idle
+slowIdleTemp_f	db      200T	; Feilding 2-Wire Idle control Slow Idle
 				; upper temperature F -40
 fastIdle_f	db      110T	; Fast Idle RPM (RPM*10 100-2550 rpm range)
 slowIdle_f	db       65T	; Slow Idle RPM (RPM*10 100-2550 rpm range)
 idleThresh_f	db       30T	; TPS Raw value for Idle mode to kick in.
 
-WWU_f1	db      180T	; WWU (-40 F) (22)
-	db      180T	; WWU (-20 F)
-	db      160T	; WWU (0 F)
-	db      150T	; WWU (20 F)
-	db      135T	; WWU (40 F)
-	db      125T	; WWU (60 F)
-	db      113T	; WWU (80 F)
-	db      108T	; WWU (100 F)
-	db      102T	; WWU (130 F)
+WWU_f1	db      190T	; WWU (-40 F) (22)
+	db      190T	; WWU (-20 F)
+	db      180T	; WWU (0 F)
+	db      170T	; WWU (20 F)
+	db      160T	; WWU (40 F)
+	db      150T	; WWU (60 F)
+	db      140T	; WWU (80 F)
+	db      130T	; WWU (100 F)
+	db      115T	; WWU (130 F)
 	db      100T	; WWU (160 F)
 
 ; This is the cranking Table so users can select a interpolated value of
 ; cranking PW the same as Warmup
 
 CrankPWs_f:
-	db      180T	; -40F (32)
-	db      120T	; -20F
-	db      80T	; 0F
-	db      60T	; 20F
-	db      55T	; 40F
-	db      50T	; 60F
-	db      45T	; 80F
-	db      40T	; 100F
-	db      35T	; 130F
-	db      30T	; 160F
+	db      181T	; -40F (32)
+	db      121T	; -20F
+	db      81T	; 0F
+	db      61T	; 20F
+	db      56T	; 40F
+	db      51T	; 60F
+	db      46T	; 80F
+	db      41T	; 100F
+	db      36T	; 130F
+	db      31T	; 160F
 
-feature11_f4   db  %00010000       ; (42)
+feature11_f4   db  %00010001       ; (42)
 AlwaysPrimeb:     equ 1    ; Only fire pump if Prime pulse ON | Prime pump every time
 PrimeLateb        equ 2    ; Fire prime pulse after 2 seconds
 PrimeTwiceb       equ 4    ; Fire the Prime Pulses Twice
@@ -14176,20 +14234,20 @@ cltcrankb:        equ $10  ; use coolant temp for crank pulsewidth
 matcrankb:        equ $20  ; use inlet air temp for crank pulsewidth. Both means average
 ExCrFuelb:        equ $40  ; Look at TPS to see if we trigger extra fuel during cranking?
 
-CrankRPM_f	db      $03	; Maximum RPM for cranking (rpm*100)
-tpsflood_f	db      $B2	; Throttle position for floodclear mode in
+CrankRPM_f	db      3T	; Maximum RPM for cranking (rpm*100)
+tpsflood_f	db      243T	; Throttle position for floodclear mode in
 				; RAW ADC
 primePulse_f    db      04T     ; prime pulse if not using table (feature11_f4 $8) *023
 ExtraCrFu_f     db      00T     ; Extra cranking fuel multiplier (feature11_f4 $40) (46)
 
 cltMATcorr_f:                   ;
                 db      100T    ; 7 positions for CLT related correction to          (47)
-                db      98T    ; IAT Air Density Correction 110 = correction * 110%
-                db      96T
-                db      94T
-                db      92T
-                db      90T
-                db      88T    ; (53)
+                db      100T    ; IAT Air Density Correction 110 = correction * 110%
+                db      100T
+                db      100T
+                db      100T
+                db      100T
+                db      100T    ; (53)
 
 RPMReduLo_f     db      10T     ; lowest rpm to reduce correction by (54)
 RPMReduHi_f     db      30T    ; Highest rpm when correction is back to normal
