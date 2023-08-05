@@ -1580,8 +1580,6 @@ EGOALL_DONE:
 **
 ***************************************************************************
 
-
-
 WARMACCEL_COMP:
 
         mov     warmcor,tmp10		; Warmup Correction in tmp10
@@ -1603,44 +1601,18 @@ WARMACCEL_COMP:
         jsr     Supernorm		; multiply/divide
         mov     tmp10,tmp5		; save whole result into tmp5
         mov     tmp11,tmp6		; save remainder into tmp6
-
-        lda     DTmode_f		; Must check the INJ1 GammaE bit,
-        bit     #alt_i1ge		; if 0 then set it to 100T to
-					; remove GammaE.
-        bne     ld_ve_1
-        mov     #100T,GammaE
-        bra     ld_ve_1Done
-
-ld_ve_1:
         mov     tmp10,GammaE
 
 ld_ve_1Done:
         mov     EGOcorr,tmp10		; closed-loop correction percent
 					; into tmp10
         clr     tmp11			; remainder is zero
-
-        brset  hybridAlphaN,feature1,skip_loadcontcomp	; if hybrid then
-							; skip AN bypass
-
-        lda    config13_f1
-        bit     #c13_cs
-        beq     MAFCheck                ; No Alpha but are we using MAF?
-        bra     LoadContribDone
-
-MAFCheck:
-        lda     feature9_f
-        bit     #MassAirFlwb
-        beq     skip_loadcontcomp       ; Are we using a MAF on pin X7?
-        bra     LoadContribDone
-
-skip_loadcontcomp:
         mov     kpa,tmp12		; MAP into tmp12
         clr     tmp13			; no remainder
         jsr     Supernorm		; do the multiply and divide
 
 ; NORMAL KPA stuff now
 LoadContribDone:
-
         mov     tmp5,tmp12		; take saved result in tmp5 and put into tmp12
         mov     tmp6,tmp13		; tmp6 into tmp13
         jsr     Supernorm		; mult/div
@@ -1666,9 +1638,6 @@ rqfe1:
         mov     tmp4,tmp13		; again for remainder
         jsr     Supernorm		; multiply/divide
         mov     tmp10,tmp11
-
-;	jsr     BATT_CORR_CALC		; result in tmp6  <- f(Vbatt)
-
 
 ***************************************************************************
 ** For    V E   T A B L E  1 and 3
@@ -1716,35 +1685,6 @@ MBFF:
         jsr     LinInterp		; injector open time in tmp6
 
 ***************************************************************************
-* Check if 300kpa or 400kpa map sensor
-***************************************************************************
-
-        lda     config11_f1
-        and     #$03
-        cmp     #$02			; Are we using Turbo Map sensor?
-        blo     CALC_FINAL    ; skip if 0 or 1
-
-; If we get here we are using non-standard map sensor
-; so do kpa * compensation factor to work out larger kpa
-; value then add it back to the normal kpa cals later
-
-        cbeqa   #2T,mul300
-        ldx     #KPASCALE400
-        bra     lcd_cont
-mul300:
-        ldx     #KPASCALE300
-lcd_cont:
-        lda     tmp11
-        mul
-        txa
-        add     tmp11
-        bcc     Store_Mod_KPa1
-        lda     #255T           ; Limit
-Store_Mod_KPa1:
-        sta     tmp11
-
-
-***************************************************************************
 **       F O R    V E   T A B L E   1 and 3
 ** Calculation of Final Pulse Width
 **
@@ -1758,7 +1698,6 @@ Store_Mod_KPa1:
 **
 ***************************************************************************
 CALC_FINAL:
-
         lda     tmp11			; From required fuel, above.
         beq     PW_Done			; If no calculated pulse, then
 					; don't open at all.
@@ -1770,314 +1709,12 @@ CALC_FINAL:
 
 MaxPulse:
         lda     #$FF
+		
 PW_Done:
-
         sta     tmp20
-        lda     feature5_f
-        bit     #stagedeither
-        beq     Calc_Final1Done
-        jsr     CALC_STAGED_PW   ; Do the Staged PW calculations if set
+
 Calc_Final1Done:
-****************************************************************************
-
-
 	mov     tmp20,tmp1		; store PW from table 1
-	lda     DTmode_f
-	bit     #alt_i2t2
-	bne     do_dt
-        jmp     both_table1		; if (inj2=t2) =0 then single table
-
-do_dt:
-; calc 'PW2' from table 2
-        mov     tmp20,tmp22		; storage for PW1 whilst doing DT
-        bset    page2,EnhancedBits4	; set page2
-***************************************************************************
-** Maybe lazy, but we have lots of flash, so quicker to have one
-** routine per page
-***************************************************************************
-VE2_LOOKUP:				; ALWAYS page 2
-        clrh
-        clrx
-
-        lda     feature9_f
-        bit     #MassAirFlwb
-        beq     VE2_LOOKUP_PW1          ; Are we using a MAF on pin X7?
-        lda     o2_fpadc                ; Using MAF thats on pin X7
-        bra     VE2_STEP_1
-
-VE2_LOOKUP_PW1:
-        lda     config13_f2
-        bit     #c13_cs
-        bne     VE2_AN			; if alpha-N
-        lda     kpa			; SD, so use kpa for load
-        bra     VE2_STEP_1
-VE2_AN:
-        lda     tps
-
-VE2_STEP_1:
-        sta     kpa_n
-        ldhx    #KPARANGEVE_f2
-        sthx    tmp1
-        lda     #$0b
-        sta     tmp3
-        lda     kpa_n
-        sta     tmp4
-        jsr     tableLookup
-        lda     tmp1
-        lda     tmp2
-        mov     tmp5,tmp8		; Index
-        mov     tmp1,tmp9		; X1
-        mov     tmp2,tmp10		; X2
-
-VE2_STEP_2:
-        ldhx    #RPMRANGEVE_f2
-        sthx    tmp1
-        mov     #$0b,tmp3		; 12x12
-        mov     rpm,tmp4
-        jsr     tableLookup
-        mov     tmp5,tmp11		; Index
-        mov     tmp1,tmp13		; X1
-        mov     tmp2,tmp14		; X2
-
-VE2_STEP_3:
-
-        clrh
-        ldx     #$0c			; 12x12
-        lda     tmp8
-        deca
-        mul
-        add     tmp11
-        deca
-        tax
-        VE2X
-        sta     tmp15
-        incx
-        VE2X
-        sta     tmp16
-        ldx     #$0c			; 12x12
-        lda     tmp8
-        mul
-        add     tmp11
-        deca
-        tax
-        VE2X
-        sta     tmp17
-        incx
-        VE2X
-        sta     tmp18
-
-        jsr     VE_STEP_4
-        mov     tmp6,vecurr2
-
- ;*********** Dual Table CALCULATIONS***********************************
- ; I think theres only need to do this bit as the rest would have been done in VE1?
-
-        mov     warmcor,tmp10		; Warmup Correction in tmp10
-        clr     tmp11			; tmp11 is zero
-        mov     tpsfuelcorr,tmp12	; tpsfuelcut in tmp12
-        clr     tmp13			; tmp13 is zero
-        jsr     Supernorm		; do the multiply and normalization
-        mov     tmp10,tmp31		; save whole result in tmp31
-        mov     tmp11,tmp32		; save remainder in tmp32
-
-        mov     barocor,tmp10		; tmp10 is barometer percent
-        clr     tmp11			; zero to tmp11
-        mov     AirCor,tmp12		; air temp correction % in tmp12
-        clr     tmp13			; tmp13 is zero
-        jsr     Supernorm		; multiply and divide by 100
-
-					; result in tmp10:tmp11
-
-        mov     tmp31,tmp12		; move saved tmp31 into tmp12
-        mov     tmp32,tmp13		; move saved tmp32 into tmp13
-        jsr     Supernorm		; multiply/divide
-        mov     tmp10,tmp5		; save whole result into tmp5
-        mov     tmp11,tmp6		; save remainder into tmp6
-
-        lda     DTmode_f
-        bit     #alt_i2ge
-        bne     ld_ve_2			; Are we using gammae in Second PW?
-        mov     #100T,GammaE
-        bra     ld_ve2_Done
-
-ld_ve_2:
-        mov     tmp10,GammaE
-ld_ve2_Done:
-        mov     EGOcorr2,tmp10		; closed-loop correction percent
-					; into tmp10
-        clr     tmp11			; remainder is zero
-
-        brset  hybridAlphaN,feature1,skip_loadccomp2	; if hybrid then
-							; skip AN bypass
-
-        lda    config13_f2
-        bit     #c13_cs
-        beq     skip_loadccomp2      ; Ignore if not alpha-N
-
-        lda     feature9_f             ; Using Alhpa-n so
-        bit     #BaroCorConstb         ; are we adding the KPa factor?
-        beq     LoadContribDn2
-
-skip_loadccomp2:
-
-        mov     kpa,tmp12		; MAP into tmp12
-        clr     tmp13			; no remainder
-        jsr     Supernorm		; do the multiply and divide
-
-; NORMAL KPA stuff now
-LoadContribDn2:
-        mov     tmp5,tmp12		; take saved result in tmp5 and put into tmp12
-        mov     tmp6,tmp13		; tmp6 into tmp13
-        jsr     Supernorm		; mult/div
-        mov     tmp10,tmp3		; result (whole) save in tmp3
-        mov     tmp11,tmp4		; remainder result save in tmp4
-
-        mov     vecurr2,tmp10		; VE into tmp10
-        clr     tmp11			; no remainder value for VE
-        lda     page
-        cmp     #02T
-        beq     rqfr2
-        lda     REQ_FUEL_f2
-        bra     rqfe2
-rqfr2:
-        lda     REQ_FUEL_r
-
-rqfe2:
-
-        sta     tmp12			; req-fuel into tmp12
-        clr     tmp13			; no remainder
-        jsr     Supernorm		; mult/div
-
-        mov     tmp3,tmp12		; take previous result and put in tmp12
-        mov     tmp4,tmp13		; again for remainder
-        jsr     Supernorm		; multiply/divide
-
-        mov     tmp10,tmp11
-
-End_DTCalcs:
-
-    ;     jsr     BATT_CORR_CALC		; result in tmp6
-
-          bra     BATT_CORR_CALC2
-
-
-***************************************************************************
-**            For    V E   T A B L E   2
-** Calculation of Battery Voltage Correction for Injector Opening Time
-**
-** Leaves result in liY == tmp6.
-** Mangles tmp1-tmp5.
-**
-** Injector open time is implemented as a linear function of
-**  battery voltage, from 7.2 volts (61 ADC counts) to 19.2 volts (164 counts),
-**  with 13.2 volts (113 counts) being the nominal operating voltage
-**
-** INJOPEN = injector open time at 13.2 volts in mms
-** BATTFAC = injector open adjustment factor 6 volts from 13.2V in mms
-**
-**
-** + (INJOPEN + BATTFAC)
-** +   *
-** +                     (INJOPEN)
-** +                         *
-** +                                       (INJOPEN - BATTFAC)
-** +                                               *
-** +
-** ++++++++++++++++++++++++++++++++++++++++++++++++++++++
-**           7.2v          13.2v          19.2v
-**
-***************************************************************************
-
-BATT_CORR_CALC2:
-        clrh
-        mov     #061T,liX1		; x1
-        mov     #164T,liX2		; x2
-        lda     injopen_f2
-        add     battfac_f2
-        sta     liY1			; y1
-        lda     injopen_f2
-        sub     battfac_f2
-        sta     liY2			; y2
-        bpl     MBFF2			; y2 < 0, underflow
-        clr     liY2			; Screws up slope, but gives
-					; reasonable result.
-MBFF2:
-        mov     batt,liX		; xInterp
-        jsr     LinInterp		; injector open time in tmp6
-
-***************************************************************************
-* Check if 300kpa or 400kpa map sensor
-***************************************************************************
-
-        lda     config11_f1
-        and     #$03
-        cmp     #$02			; Are we using Turbo Map sensor?
-        blo     CALC_FINAL2    ; skip if 0 or 1
-
-; If we get here we are using non-standard map sensor
-; so do kpa * compensation factor to work out larger kpa
-; value then add it back to the normal kpa cals later
-
-        cbeqa   #2T,mul300_2
-        ldx     #KPASCALE400
-        bra     lcd_cont2
-mul300_2:
-        ldx     #KPASCALE300
-lcd_cont2:
-        lda     tmp11
-        mul
-        txa
-        add     tmp11
-        bcc     Store_Mod_KPa2
-        lda     #255T           ; Limit
-Store_Mod_KPa2:
-        sta     tmp11
-
-***************************************************************************
-**       F O R    V E   T A B L E   2
-** Calculation of Final Pulse Width
-**
-**  The following equation is evaluated here:
-**
-**  tmp20 = tmp6 + TMP11 + TPSACCEL - INJOCFUEL
-**
-**  Note that InjOCFuel (injected fuel during injector open and
-**  close) is currently a constant - eventually it will be a function
-**  of battery voltage.
-**
-***************************************************************************
-CALC_FINAL2:
-
-        lda     tmp11			; From required fuel, above.
-        beq     PW2_Done			; If no calculated pulse, then
-					; don't open at all.
-        add     tmp6			; from batt correction
-        bcs     MaxPulse2
-        add     TPSACCEL
-        bcs     MaxPulse2
-        bra     PW2_Done
-
-MaxPulse2:
-        lda     #$FF
-PW2_Done:
-        sta     tmp21           ; PW2 temp
-
-Calc_Final2Done:
-****************************************************************************
-
-        mov     tmp22,tmp1		; When DT done put PW1 back into tmp1
-
-PW2_calc:
-        clr     tmp2
-        lda     DTmode_f
-        bit     #alt_i2t2		; if inj2 is not driven from
-					; table1 then skip
-        bne     pw2_table2
-        mov     tmp20,tmp2		; 'PW' from table 1
-        bra     checkRPMsettings
-pw2_table2:
-        mov     tmp21,tmp2		; 'PW' from table 2
-        bra     checkRPMsettings
 
 both_table1:
         lda     tmp20
@@ -2096,16 +1733,13 @@ cutChannels:
         bclr    OverRun,EnhancedBits		; Reset Over Run Fuel Cut
         mov     tmp1,pwcalc1
         mov     tmp2,pwcalc2
-        jmp     spark_lookup					; In fuel cut mode so return
+        bra     spark_lookup					; In fuel cut mode so return
 						; with zeros
 checkRevsOk:
         brset   OverRun,EnhancedBits,cutChannels; If Over run fuel cut on
 						; cut fuel
-
-
         mov       tmp1,pwcalc1
         mov       tmp2,pwcalc2
-        jmp       spark_lookup
 
 ***************************************************************************
 **
