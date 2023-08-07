@@ -2240,68 +2240,6 @@ VE_STEP_6:
         jsr     LinInterp
         rts
 
-;*******************************************************
-;*** Boost Controller  table lookup macros
-;*;these lookup macros are messed up because they refer to the
-;*;wrong page and the ram lookup is from the wrong place
-;*; i.e. if two table per flash page it is no good to do VE_r,x
-;*; because that will return the wrong data
-;*; 022i - commented out until they get fixed
-
-					; boost control TABLE 1
-;*$MACRO bc1X				; gets a byte from page8 or RAM.
-					; On entry X contains index.
-					; Returns byte in A
-;        lda     page
-;        cmp     #08T    ; it isn't in page !!!!
-;        bne     ve7xf
-;        lda     VE_r,x
-;        bra     ve7xc
-;*ve7xf:  lda     bc_kpa_f,x
-;*ve7xc:
-;*$MACROEND
-
-					; boost control TABLE 2
-;*$MACRO bc2X				; gets a byte from page8 or RAM.
-					; On entry X contains index.
-					; Returns byte in A
-;        lda     page
-;        cmp     #08T
-;        bne     ve8xf
-;        lda     VE_r,x
-;        bra     ve8xc
-;*ve8xf:  lda     bc_dc_f,x
-;*ve8xc:
-;*$MACROEND
-
-					; boost control TABLE 3 for
-					; switching boost table on the run
-;*$MACRO bc3X				; gets a byte from page8 or RAM.
-					; On entry X contains index.
-					; Returns byte in A
-;        lda     page
-;        cmp     #08T
-;        bne     ve9xf
-;        lda     VE_r,x
-;        bra     ve9xc
-;*ve9xf:  lda     bc3_kpa_f,x
-;*ve9xc:
-;*$MACROEND
-
-					; rotary trailing split					; switching boost table on the run
-$MACRO rs1X				; gets a byte from flash or RAM.
-					; On entry X contains index.
-					; Returns byte in A
-;just work from flash for now
-        lda     page
-        cmp     #07T
-        bne     rs1xf
-        lda     {VE_r+split_f-flash_table7},x   ; offset into ram copy
-        bra     rs1xc
-rs1xf:  lda     split_f,x
-rs1xc:
-$MACROEND
-
 ***************************************************************************
 
 $MACRO TurnAllSpkOff			; gets called in stall or on
@@ -2336,6 +2274,7 @@ $MACRO  SubDwell
                 sbc     #0
                 sta     dwelltmpXop
 $MACROEND
+
 $MACRO DwellRail
 ; check if we've gone too low
                 lda     dwelltmpXop
@@ -2402,6 +2341,7 @@ $MACROEND
 turnallsparkoff:
         TurnAllSpkOff
         rts
+		
 ***************************************************************************
 * Spark and Dwell stuff
 * Some bits moved out of interrupt routines to save a few ticks
@@ -2717,7 +2657,7 @@ TIMERROLL:
                 bclr    CHxF,T2SC0	; clear pending bit
                 lda     T2CNTL		; unlatch any previous read (added JSM)
 
-;* revised section - from Dan Hiebert's TFI code
+; revised section - from Dan Hiebert's TFI code
                  ldhx    T2CH0H		; Load index register with value
 					; in TIM2 CH0
 					; register H:L (output compare value)
@@ -2747,108 +2687,7 @@ TIMER_DONE:
 ***************** 0.1 millisecond section ********************************
 ***************************************************************************
 
-        brset    config_error,feature2,error_exit
         inc      mms			; bump up 0.1 millisec variable
-
-; Added for boost control - Hope it doesnt screw up the timer -
-; James will kill me if it does
-        brclr    BoostControl,feature2,bcActDone
-        inc      mmsDiv			; Counts up to bcFreqDiv.
-        lda      mmsDiv			; Counter at multiples of 0.1 ms
-        cmp      bcFreqDiv_f		; 1=39.1 Hz, 2=19.5, 3=13.0 and so on.
-        blo      bcActDone
-        clr      mmsDiv
-        inc      bcActClock
-        lda      bcActClock
-bcActDone:
-
-        brset   TFI,personality,j_tfi_spk
-;*        brset   EDIS,personality,go_inj_fire3
-        brset   MSNEON,personality,neon_irq
-        brset   WHEEL,personality,wheel_irq
-
-        lda     personality
-        bne     no_wd_trig              ; any other spark modes skip over 2nd irq bits
-        jmp     INJ_FIRE_CTL		; skip this section if not
-					; controlling spark
-error_exit:
-        pulh
-        rti
-
-;*go_inj_fire3:
-;*        brset   DUALEDIS,personality,edis2_fire_a
-;*        jmp     INJ_FIRE_CTL
-
-j_tfi_spk:
-        jmp     tfi_spk			; branch to next chunk
-
-neon_irq:
-; Neon crank decoding
-; See if we have seen a rising IRQ edge and save it
-
-        bil     no_wd_trig
-
-        brset   rise,sparkbits,no_wd_trig	; only store the rising edge
-        bset    rise,sparkbits
-
-        mov    lowresL,SparkTempL
-        mov    lowresH,SparkTempH
-
-        bra    no_wd_trig        ; we've done the Neon bit
-
-
-wheel_irq:
-;more bloat... check for second "reset" spark input
-      brclr   wd_2trig,feature1,no_wd_trig
-
-      lda     dtmode_f
-      bit     #trig2risefallb
-      bne     wd_risefall      ; do rising & falling
-
-      bit     #trig2fallb
-      bne     wd_inv
-
-;on rising edge of input reset wheelcount to zero
-      brset   rise,sparkbits,wd_rise ; already found so see if ready to clear
-;not already in high state so see if pin has been asserted
-      brclr   pin11,portc,no_wd_trig   ; inactive
-;we've found a rising edge of pin11, so clear wheelcount (tooth zero) and set rise bit
-      bset    rise,sparkbits           ; this bit used to monitor the edge of the input
-      bra     wd_2_flag
-wd_rise:
-      brset   pin11,portc,no_wd_trig
-      bclr    rise,sparkbits
-      bra     no_wd_trig
-
-wd_inv:
-;on falling edge of input reset wheelcount to zero
-      brset   rise,sparkbits,wd_fall ; already found so see if ready to clear
-;not already in high state so see if pin has been asserted
-      brclr   pin11,portc,no_wd_trig   ; inactive
-      bset    rise,sparkbits
-      bra     no_wd_trig
-wd_fall:
-      brset   pin11,portc,no_wd_trig
-;we've found a falling edge of pin11, so clear wheelcount (tooth zero) and set rise bit
-      bclr    rise,sparkbits           ; this bit used to monitor the edge of the input
-      bra     wd_2_flag
-
-wd_risefall:
-;on rising and falling edge of input reset wheelcount to zero
-      brset   rise,sparkbits,wd_rf1 ; was high
-      brclr   pin11,portc,no_wd_trig   ; still low
-      bset    rise,sparkbits
-      bra     wd_2_flag
-
-wd_rf1:
-      brset   pin11,portc,no_wd_trig ; still high
-      bclr    rise,sparkbits
-;      bra     wd_2_flag
-
-wd_2_flag:
-      bset    trigger2,EnhancedBits6   ; flag the trigger
-
-no_wd_trig:
 
 ; now with multi-dwell check them all each time (how much delay to
 ; 0.1ms routine?) this routine is flawed but only slightly - when one
@@ -2860,7 +2699,7 @@ no_wd_trig:
         mov     coilsel,SparkCarry; temporary
 
 	brclr	indwell,EnhancedBits4,sin_a
-	brset	rotary2,EnhancedBits5,clr_a_b
+
 
 sin_a:
         ldhx    SparkOnLeftah
@@ -2874,81 +2713,20 @@ sin_a:
         bra     lowspdspk
 sin_b:
         ldhx    SparkOnLeftbh
-        beq     sin_c
+        beq     j_CSL
         aix     #-1			; is it time to start charging
         sthx    SparkOnLeftbh
         cphx    #0
-        bne     sin_c
-        clr     coilsel
-        bset    coilbbit,coilsel
-        bra     lowspdspk
-clr_a_b:
-	ldhx	#0
-	sthx	SparkOnLeftah
-	sthx	SparkOnLeftbh
-sin_c:
-        ldhx    SparkOnLeftch
-        beq     sin_d
-        aix     #-1			; is it time to start charging
-        sthx    SparkOnLeftch
-        cphx    #0
-        bne     sin_d
-        clr     coilsel
-        bset    coilcbit,coilsel
-        bra     lowspdspk
-sin_d:
-        ldhx    SparkOnLeftdh
-        beq     sin_e
-        aix     #-1			; is it time to start charging
-        sthx    SparkOnLeftdh
-        cphx    #0
-        bne     sin_e
-        clr     coilsel
-        bset    coildbit,coilsel
-        bra     lowspdspk
-
-sin_e:
-        ldhx    SparkOnLefteh
-        beq     sin_f
-        aix     #-1			; is it time to start charging
-        sthx    SparkOnLefteh
-        cphx    #0
-        bne     sin_f
-        clr     coilsel
-        bset    coilebit,coilsel
-        bra     lowspdspk
-sin_f:
-        ldhx    SparkOnLeftfh
-        beq     j_CSL
-        aix     #-1			; is it time to start charging
-        sthx    SparkOnLeftfh
-        cphx    #0
         bne     j_CSL
         clr     coilsel
-        bset    coilfbit,coilsel
+        bset    coilbbit,coilsel
         bra     lowspdspk
 
 j_CSL:
         cli
         jmp     CHECK_SPARK_LATE
 
-go_inj_fire:
-        jmp     INJ_FIRE_CTL
-
-
 lowspdspk:
-                brclr   rotary2,EnhancedBits5,chkindwell
-                brset   coilabit,coilsel,chkindwell
-                brset   coilbbit,coilsel,chkindwell
-                lda     splitdelH
-                cmp     #$FF     ; if trailing is OFF then don't charge coil
-                beq     blssd
-lss2:
-	; add check for rotary, which checks for coilcbit/coildbit
-chkcoilcd: ; make sure that we dwell coil c/d even if indwell.
-	brset	coilcbit,coilsel,dodwell
-	brset	coildbit,coilsel,dodwell
-chkindwell:
         brset   indwell,EnhancedBits4,blssd	; if doing hi-res
 					; dwell then don't turn on coil now
 dodwell:
@@ -2961,11 +2739,8 @@ dodwell:
         lda     #01T
 Dont_ResetCnt:
         sta     SparkCutCnt	; Store new value to spark counter
-        brset   sparkCut,RevLimBits,blssd	; If in spark cut
-					; mode jump past spark
 
-        brset   invspk,EnhancedBits4,lsspk_inv ; check if noninv or inv spark
-        COILPOS				; charge coil for non-inverted
+        bra     lsspk_inv       ;* RJH 7/25/23
 blssd:
         bra     lsspk_done
 lsspk_inv:
@@ -2986,11 +2761,7 @@ CHECK_SPARK_LATE:
 ;this will give a 1-2 second delay before timebased is used
 ; hopefully this will not be a problem
         brset   cant_crank,EnhancedBits2,timebased
-
-        lda     SparkConfig1_f		; check if noninv or inv spark
-        bit     #M_SC1TimCrnk		; Check if spark on time or IRQ
-					; return (SparkConfig1 already in A)
-        beq     IRQ_SPARK
+		bra     IRQ_SPARK   ;* RJH 7/25/23
 
 timebased:
         ;Check if time for spark
@@ -3001,27 +2772,18 @@ timebased:
         cmp     SparkDelayL
         bne     jINJ_FIRE_CTL
         bra     ChkHold
+		
 ;**
 jINJ_FIRE_CTL:				; convenient place to branch to
         jmp     INJ_FIRE_CTL
 ;**
 
 IRQ_SPARK:
-        brset   MSNEON,personality,irq_spark_neon
-        brset   WHEEL,personality,irq_spark_neon
-        bil     jINJ_FIRE_CTL		; IRQ still low? then skip
+        bra    irq_spark_neon  ;* RJH 8/07/23    
 
 ChkHold:
         bclr    sparktrigg,sparkbits	; No more sparks for this IRQ
-        brset   MSNEON,personality,DoSparkLSpeed
-        brset   WHEEL,personality,DoSparkLSpeed	; no hold off on wheel decoder
-        lda     wheelcount		; (HoldSpark)
-					; Check if spark is held (after
-					; stall and restart)
-        beq     DoSparkLSpeed
-        dec     wheelcount		; (HoldSpark)
-					; One spark has been held, x to go
-        jmp     INJ_FIRE_CTL
+		bra   DoSparkLSpeed  ;* RJH 8/07/23 
 
 ; This will not work with wheel decoder, need to use a flag
 ;        Treat end of third pulse as trigger return
@@ -3033,82 +2795,13 @@ irq_spark_neon:
 DoSparkLSpeed:
         bset    sparkon,revlimbits	; spark now on
 
-        brset   invspk,EnhancedBits4,dosls_inv
-        COILNEG				; macro = fire coil for non-inverted
-        bra     dosls_done
-dosls_inv:
         COILPOS				; macro = fire coil for inverted
-dosls_done:
+
 ; changed - low speed and dwell control, schedule dwell at same time
 ; as we schedule the spark to maintain a consistent dwell
-;
-        brset   dwellcont,feature7,b_INJFC2	; don't schedule chg time
-					; here (low speed)
-        brset   min_dwell,feature2,b_INJFC2	; don't schedule chg time here
-        bra     dosls_cd
+
 b_INJFC2:
         jmp     INJ_FIRE_CTL
-dosls_fd:
-; if doing dwell control, figure out when to schedule dwell.
-        brclr   crank,engine,dosls_cd
-        brset   min_dwell,feature2,b_INJFC2	; don't schedule chg time here
-; in dwell mode min_dwell means turn coil to charge at trigger point,
-; but this can give a very long dwell period which won't be good for IGBTs
-;
-dosls_cd:
-        sei
-        CalcDwellspk			; Calculate spark on time
-        cli
-b_INJFC:
-        bra     INJ_FIRE_CTL
-
-;fresh section for TFI spark to keep things clearer
-TFI_spk:
-        ;if tfi & sparkon & low speed & irq high then follow
-; ??? next line irrelevant ??? commented 027b 20th Nov 05
-;        brclr   sparkon,revlimbits,INJ_FIRE_CTL	; if output not active then
-					; skip
-;        brclr   sparktrigg,sparkbits,INJ_FIRE_CTL	; if sparktrigg???
-					; not active then skip
-        brclr   SparkLSpeed,Sparkbits,tfi_fast	; if not slow then do high
-					; speed calc
-        bil     INJ_FIRE_CTL		; if IRQ still low then skip
-        bra     tfispkoff		; irq has risen, de-activate output
-
-tfi_fast:
-        ; if high speed only need to worry about trailing (rising) edge
-	; of output as the firing (falling) edge of the output is done
-	; by the hi-res timer section
-        ;
-        ldhx    SparkOnLeftah
-        beq     INJ_FIRE_CTL		; shouldn't happen, but just in case
-        aix     #-1
-        sthx    SparkOnLeftah
-        cphx    #0
-        bne     INJ_FIRE_CTL
-
-tfispkoff:
-        bclr    sparkon,revlimbits	; spark now off
-        ; with TFI as envisaged it only really makes sense to have one
-	; kind of wiring but keep inverted/non-inverted. Only one output
-        ;
-
-        brclr   invspk,EnhancedBits4,tfioutoff
-;inverted
-        brset   REUSE_FIDLE,outputpins,tfiif
-        bset    coila,portc
-        bra     INJ_FIRE_CTL
-tfiif:
-        bset    iasc,porta
-        bra     INJ_FIRE_CTL
-
-tfioutoff:
-        brset   REUSE_FIDLE,outputpins,tfiof
-        bclr    coila,portc
-        bra     INJ_FIRE_CTL
-tfiof:
-        bclr    iasc,porta
-;        bra     INJ_FIRE_CTL
 
 INJ_FIRE_CTL:
 ;======== Injector Firing Control ========
@@ -3129,8 +2822,7 @@ NEW_SQUIRT1:
 					; now current operation)
         bset     inj1,squirt
         clr      pwrun1
-        brset    REUSE_LED17,outputpins,nsq1
-        bset     sled,portc		; squrt LED is ON
+
 nsq1:
         mov      #$00,T1CH0H
         lda      INJPWM_f1
@@ -3149,17 +2841,10 @@ NEW_SQUIRT2:
 					; current operation)
         bset     inj2,squirt
         clr      pwrun2
-        brset    REUSE_LED17,outputpins,nsq2
-        bset     sled,portc		; squrt LED is ON
+
 nsq2:
         mov      #$00,T1CH1H
-        lda      DTmode_f
-        bit      #alt_i2t2
-        beq      nsq2single
 
-        lda      INJPWM_f2
-        bra      nsq2cont
-nsq2single:
         lda      INJPWM_f1
 nsq2cont:
         sta      T1CH1L
@@ -3167,19 +2852,6 @@ nsq2cont:
 					; for Injector 2
         bclr     inject2,portd		; ^* * * Turn on Injector #2
 					; (inverted drive)
-
-         lda     feature3_f
-         bit     #WaterInjb
-         beq     INJF2
-;        brclr    WaterInj,feature3,INJF2
-        brset    water,porta,inject_water	; If water needed go to
-					; inject water
-	  bra	     INJF2
-inject_water:
-       brset  Nitrous,feature1,INJF2	; If NOS Selected dont turn on
-					; water pulsed output
-       bset   water2,porta		; Turn water injector on with
-					; fuel inj 2
        bra    INJF2			; Carry on as normal
 INJF3JMP:
        bra    INJF3
@@ -3213,7 +2885,6 @@ PWM_LIMIT_1:
         mov      #T1Timerstop,T1SC
         mov      #T1SCX_PWM,T1SC0
         mov      #Timergo_NO_INT,T1SC
-;        bra      INJF3JMP
         jmp      INJF3
 
 ;=== Injector #2 - Check for end of Injection ===
@@ -3222,20 +2893,9 @@ CHK_DONE_2:
         lda      pwrun2
         cmp      pw2
         beq      OFF_INJ_2
-;	brset	 crank,engine,CHECK_RPM	; do not perform PWM limiting
-					; when cranking
 	brclr	 crank,engine,CKDN2
         jmp      CHECK_RPM
 CKDN2:
-        lda      DTmode_f
-        bit      #alt_i2t2
-        beq      ckd2single		; dt=0
-
-        lda      pwrun2			; use PWM settings from second table
-        cmp      INJPWMT_f2
-        beq      PWM_LIMIT_2
-	bra	 inj2done
-ckd2single:
         lda      pwrun2			; use PWM settings from first table
         cmp      INJPWMT_f1
         beq      PWM_LIMIT_2
@@ -3249,13 +2909,6 @@ OFF_INJ_2:
 					; (for Inj 2)
         bset     inject2,portd		; ^* * * Turn Off Injector #2
 					; (inverted drive)
-         lda     feature3_f
-         bit     #WaterInjb
-         beq     Dont_Clr_Water2
-;        brclr    WaterInj,feature3,Dont_Clr_Water2	; if not using water
-					; then skip
-        bclr     water2,porta		; Turn off water injection pulse
-Dont_Clr_Water2:
         mov      #T1Timerstop,T1SC
         mov      #t1scx_NO_PWM,T1SC1
         mov      #Timergo_NO_INT,T1SC
@@ -3266,7 +2919,6 @@ PWM_LIMIT_2:
         mov      #Timergo_NO_INT,T1SC
 
 inj2done:
-        brset    REUSE_FIDLE,outputpins,idleActDone
 
 *****************************************************************************
 ** Idle Control PWM Actuator
@@ -3306,57 +2958,12 @@ idleActOff:
 
 idleActDone:
 
-*****************************************************************************
-**  Boost Controller PWM
-**
-**  Set bcDC to 0 (0% duty cycle) to 255 (100% DC).  PWM frequency is
-**  user-defined by bcFreqDiv, see above.
-**
-**
-**  020w3  0% = low boost, 100% = high boost  in calculations
-**  can invert the output to reverse the sense
-*****************************************************************************
-
-        brclr  BoostControl,feature2,doneBoostControl
-doBoostControl:
-        lda     bcDC
-        beq     boostOff		; Turn it off, if duty cycle is zero.
-        cmp     bcActClock
-        blo     boostOff
-
-boostOn:
-        lda     feature6_f
-        bit     #BoostDirb
-        bne     bcClrout
-;        brset   BoostDir,feature6,bcClrout	; Change dir for high
-					; pulsewidth reduce boost
-        bra     bcSetout
-boostOff:
-        lda     feature6_f
-        bit     #BoostDirb
-        bne     bcSetout
-;        brset   BoostDir,feature6,bcSetout	; Change dir for high
-					; pulsewidth reduce boost
-        bra     bcClrout
-
-bcSetout:
-        bset    boostP,porta
-        bra     doneBoostControl
-
-bcClrout:
-        bclr    boostP,porta
-
-doneBoostControl:
-
 ;=======Check RPM Section=====
 CHECK_RPM:
         brclr    running,engine,b_ENABLE; Branch if not running
 					; right now
         brset    firing1,squirt,CHK_RE_ENABLE
         brset    firing2,squirt,CHK_RE_ENABLE
-        brset    REUSE_LED17,outputpins,CHK_RE_ENABLE
-        bclr     sled,portc		; squrt LED is OFF - nothing
-					; is injecting
 
 CHK_RE_ENABLE:
 ;====== Check for re-enabling of IRQ input pulses
@@ -3379,46 +2986,8 @@ RPMLOWBYTECHK:
 
 REARM_IRQ:
 ; Also do tacho output in here to give 50% output duty
-        lda      tachconf_f
-        and      #$7f
-        beq      CHK_REARM
-;tachoff:
-        cbeqa    #1T,tachoff_x2
-        cbeqa    #2T,tachoff_x3
-        cbeqa    #3T,tachoff_x4
-        cbeqa    #4T,tachoff_x5
-        cbeqa    #5T,tachoff_out3
-        cbeqa    #6T,tachoff_pin10
-        bra      CHK_REARM
-tachoff_x2:
-        bclr     water,porta
-        bra      CHK_REARM
-tachoff_x3:
-        bclr     water2,porta
-        bra      CHK_REARM
-tachoff_x4:
-        bclr     output1,porta
-        bra      CHK_REARM
-tachoff_x5:
-        bclr     output2,porta
-        bra      CHK_REARM
-tachoff_out3:
-        bclr     output3,portd
-        bra      CHK_REARM
-tachoff_pin10:
-        bclr     pin10,portc
-        bra      CHK_REARM
 
-CHK_REARM:
-        brset    MSNEON,personality,INCRPMER	; irq always on in Neon mode
-        brset    WHEEL,personality,INCRPMER	; irq always on in Wheel mode
-
-        lda      feature6_f
-        bit      #falsetrigb           ; can disable false trigger protection for testing
-        bne      INCRPMER
-
-	bset	 ACK,INTSCR		; clear out any latched interrupts
-	bclr	 IMASK,INTSCR		; enable interrupts again for IRQ
+       bclr     output2,porta    ;* tacho  off
 
 INCRPMER:
         sei
@@ -3469,7 +3038,6 @@ stall:
         TurnAllSpkOff			; macro to turn off all spark outputs
 
 stall_cont:
-        brset    EDIS,personality,pass_store
         lda      TriggAngle_f		; Calculate crank delay angle
         sub      CrankAngle_f
         add      #28T			; - -10 deg
@@ -3479,10 +3047,6 @@ pass_store:
         sta      SparkAngle
         lda      SparkHoldCyc_f		; Hold spark after stall
         sta      wheelcount		; (HoldSpark)
-        brset    MSNEON,personality,wc_wheel
-        brset    WHEEL,personality,wc_wheel
-        bra      ENABLE_THE_IRQ
-wc_wheel:
         mov     #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff
         bclr    wsync,EnhancedBits6
         bset    whold,EnhancedBits6
@@ -3511,34 +3075,8 @@ CHECK_MMS:
 ****************************************************************************
 
 MSEC:
-;        brset     egoIgnCount,feature1,No_Ego_mSec	; Are we using mSec
-					; for ego counter?
-        lda       feature14_f1
-        bit       #egoIgnCountb
-        bne       No_Ego_mSec
-        inc       egocount		; Increment EGO step counter
-
-No_Ego_mSec:
-
         inc      ms			; bump up millisec
         clr      mms
-
-        brclr    REUSE_LED18,outputpins,FIRE_ADC	; only do this if
-					; using as IRQ monitor
-        brset    REUSE_LED18_2,outputpins,FIRE_ADC	; not if spark c
-        bil      IRQ_LOW		; Check if IRQ pin low
-        bclr     wled,portc		; Turn OFF IRQ led
-
-        bra      FIRE_ADC
-
-IRQ_LOW:
-        brset    MSNEON,personality,FIRE_ADC	; irrelevant
-        brset    WHEEL,personality,FIRE_ADC	; irrelevant
-        bset     wled,portc		; Turn ON IRQ led (in case of
-					; bouncing points or what ever)
-
-FIRE_ADC:
-; Fire off another ADC conversion, channel is pointed to by ADSEL
 	lda	adsel
 	ora	#%01000000
 	sta	adscr
@@ -3563,20 +3101,6 @@ MSDONE:
         bra      end100th
 
 one00th:
-        brclr   Launch,portd,nol_timer		; Button is pressed so skip timer
-        lda     n2olaunchdel
-        beq     nol_timer               ; already zero
-        sub     #1
-        sta     n2olaunchdel
-nol_timer:
-
-;        ;do similar for nitrous fuel hold on
-;        brclr   ?????,????,non2o_timer		; Nitrous on so skip timer
-;        lda     n2ohold
-;        beq     non2o_timer            ; already zero
-;        sub     #1
-;        sta     n2ohold
-;non2o_timer:
 
 end100th:
         lda      ms
@@ -3612,61 +3136,16 @@ restart_F1:
 
 oneten_notlog:
         inc      tenth
-        inc      Out3Timer
         lda      rpm
         sta      rpmlast
+    bra    No_TPSCount  ;* RJH 7/31/23 
 
-        lda      ST2Timer
-        beq      ST2Timer_zero
-        dec      ST2Timer
-ST2Timer_zero:
-        lda     VE3Timer		; VE Table3 delay timer
-        beq     VE3Timer_zero
-        dec     VE3Timer
-VE3Timer_zero:
-       brset   UseVE3,EnhancedBits,No_VE3_delay	; Are we running from VE3?
-       lda     VE3Delay_f
-       sta     VE3Timer
-No_VE3_delay:
-        brclr   NosIn,portd,No_St2Delay
-        lda     Spark2Delay_f		; If input not low reset ST2
-					; delay timer
-        sta     ST2Timer
-No_St2Delay:
-
-        brset    taeIgnCount,feature1,No_TPSCount
-        inc      tpsaclk
-
-; Save current TPS reading in last_tps variable to compute TPSDOT
-; in acceleration enrichment section
-
-       lda     feature4_f
-       bit     #KpaDotSetb
-       beq     tps_dot_mode
-;       brclr   KpaDotSet,feature4,tps_dot_mode	; If not in KPA dot mode
-					;jump past KPa settings
-       lda     kpa
-       bra     Kpa_Dot_Mode
 ;******
 RTC_DONEJMP:
        jmp     RTC_DONE
 ;******
-tps_dot_mode:
-       lda      tps
-Kpa_Dot_Mode:
-       sta      TPSlast
 
 No_TPSCount:
-
-; Check Magnus rev limit times
-
-        lda      SRevLimTimeLeft	; Check if time left already zero
-        beq      TimeLeft
-        dec      SRevLimTimeLeft	; Count down time left
-        bne      TimeLeft		; Time left done
-        bset     RevLimHSoft,RevLimBits	; Set soft rev limiter fuel cut bit
-TimeLeft:
-
         lda      tenth
         cmp      #$0A
         blo      RTC_DONE
@@ -3677,23 +3156,6 @@ TimeLeft:
 SECONDS:
         inc      OverRunTime
 
-	brclr	 IdleAdvTimeOK,EnhancedBits6,knock_timer_checks
-	lda	 idlAdvHld
-	inca
-	sta	 idlAdvHld
-
-knock_timer_checks:
-        lda      KnockTimLft		; Load the knock timer
-        cmp      #00T
-        beq      Secs			; If its zero carry on with seconds
-        deca				; If not dec it
-        sta      KnocktimLft
-Secs:
-        lda      feature10_f5
-        bit      #ASEIgnCountb
-        beq      sec_cont
-        inc      ASEcount
-sec_cont:
 ; crank mode inhibit
 ; make a 1-2 second delay
 ; if running and !cranking and !cant_delay then set cant_delay
@@ -3747,7 +3209,6 @@ RTC_reset:
         stx     T2CH0L
 
 RTC_DONE2:
-;        bclr    TOF,T2SC0
         bset    TOIE,T2SC0		; re-enable 0.1ms interrupt
 NOTSPKTIME:				; close branch for below
         pulh
@@ -3758,7 +3219,7 @@ NOTSPKTIME:				; close branch for below
 ** Spark timing
 **
 ***************************************************************************
-INT_SPARK_OFFa:   jmp   INT_SPARK_OFF
+
 j_hires_dwell:    jmp   hires_dwell
 
 SPARKTIME:
@@ -3770,120 +3231,21 @@ SPARKTIME:
 					; on time when going slow
                 brset   indwell,EnhancedBits4,j_hires_dwell	; start dwell
 					; period
-                brset   EDIS,personality,set_spkon
                 brclr   SparkTrigg,Sparkbits,NOTSPKTIME	; Should never do this
-
-;spark cut used to be here, but moved to TIMERROLL to eliminate chance of
-;overheating ignitors when in spark-cut because coils were left switched ON
-
-set_spkon:
-                brclr   SparkTrigg,Sparkbits,INT_SPARK_OFFa	; Check for
-					; spark trigg, used end of pulse
-set_spkon2:
                 bset    sparkon,revlimbits	; spark now on
-                brset   invspk,EnhancedBits4,sson_inv
-                COILNEG			; macro = fire coil for non-inverted
-                bra     SparkOnDone
-sson_inv:
-                COILPOS			; macro = fire coil for inverted
-SparkOnDone:
-                brclr   EDIS,personality,sod_ne
-                jmp     set_saw_on
-jsod_cd_done:   jmp     sod_cd_done
 
-sod_ne:
+                COILPOS			; macro = fire coil for inverted
+
                 bclr    TOIE,T2SC1	; Disable interrupts
-                brset   dwellcont,feature7,sod_cd
-                brset   min_dwell,feature2,jsod_cd_done	; don't schedule
-					; here if minimal dwell wanted
-sod_cd:
+
                 CalcDwellspk		; Set spark on time
-sod_cd_done:
-;now check if we should schedule a trailing spark
-                brset   rotary2,EnhancedBits5,chktrail
+
 sparktime_exit:
                 bclr    SparkTrigg,Sparkbits	; No more sparks for this IRQ
-NOT_SPARK_TIME:
-                pulh
-                rti
-
-;if in twin rotor mode, check to see if we should schedule or fire the trailing
-chktrail:
-                brset   coilcbit,coilsel,sparktime_exit   ; already done - exit
-                brset   coildbit,coilsel,sparktime_exit   ; already done - exit
-
-                brset   coilbbit,coilsel,ctb
-                clr     coilsel
-                bset    coilcbit,coilsel        ; was coila, now coilc
-                bra     ct_done
-ctb:
-                clr     coilsel
-                bset    coildbit,coilsel        ; was coilc, now coild
-ct_done:
-;       if trailing split off still "fire the coil" now just in case we have
-;       already started charging it - don't want to burn out coil as we
-;       transition from trailing to no trailing
-; "lowspdspk" code checks and doesn't turn coil on if trailing is off,
-; see that section within 0.1ms
-
-                brclr   rsh_s,EnhancedBits5,force_trail_off  ; if split out of range then OFF
-                brclr   rsh_r,EnhancedBits5,force_trail_off  ; if rpm out of range then OFF
-
-                lda     splitdelH
-                beq     split_min      ; is zero so check for short split
-                cmp     #$FF
-                bne     split_timed
-                jmp     force_trail_off     ; ensure trailing coil off
-                ;maybe need some hysteresis with this to avoid jittery behaviour
-
-;check if split < 64us, then fire now
-split_min:
-                lda     splitdelL
-                cmp     #64T             ; 64us
-                bhi     split_timed
-;split_min_set:
-;                clr     splitdelL
-;                mov     #64T,splitdelH
-                jmp     set_spkon2     ; jump back up to fire next spark
-split_timed:
-                lda     T2CNTL		; unlatch low byte
-
-                ldx     T2CNTH
-                stx     T2CurrH		; Save current counter value
-                lda     T2CNTL
-                sta     T2CurrL		; Save current counter value
-
-                lda     T2CurrL
-                add     splitdelL
-                tax
-                lda     T2CurrH
-                adc     splitdelH
-                sta     T2CH1H
-                stx     T2CH1L
-
-                bset    SparkTrigg,Sparkbits	; keep spark enabled
-
-                bclr    TOF,T2SC1	; clear any pending interrupt
-                bset    TOIE,T2SC1	; Enable timer interrupt
-		pulh
-                rti
-
-force_trail_off:
-          ;ensure trailing coil is really off
-	  	bset    wled,portc
-                brset   invspk,EnhancedBits4,to_inv
-                bset    coilb,portc
-                bra     to_exit
-to_inv:         bclr    coilb,portc
-to_exit:
-                bclr    SparkTrigg,Sparkbits	; No more sparks for this IRQ
-;kill the dwell timers for trailing in the mainloop
                 pulh
                 rti
 
 hires_dwell:
-                ; never do trailing dwell in "hi-res" so no need to
-                ; consider trailing here
 
 ;first turn on coil, then reset T2 to spark point saved in sparktargetH/L
 ;spark cut- actually cut the coil-on
@@ -3894,16 +3256,9 @@ hires_dwell:
                 lda     #01T
 Dont_ResetCnt2:
                 sta     SparkCutCnt	; Store new value to spark counter
-                brset   sparkCut,RevLimBits,bhrds	; If in spark cut
-					; mode jump past spark
 
-                brset   invspk,EnhancedBits4,hrd_inv
-                COILPOS			; macro = charge coil for non-inverted
-bhrds:
-                bra     hrd_set
-hrd_inv:
                 COILNEG			; macro = charge coil for inverted
-hrd_set:
+
                 bclr    indwell,EnhancedBits4	; turn it off so next
 					; sparktime fires coil
                 bclr    sparkon,revlimbits	; spark now on
@@ -3918,83 +3273,6 @@ hrd_set:
 
                 pulh
                 rti
-
-set_saw_on:				; now set timer for SAW on period
-					; using sawh/l calculated in main loop
-
-;Calculate width of SAW pulse
-;grab current timer values - uses same variable as squirt section below. But no  cli  so ok
-                lda     T2CNTL		; unlatch low byte
-                ldx     T2CNTH
-                stx     T2CurrH		; Save current counter value
-                lda     T2CNTL
-                sta     T2CurrL		; Save current counter value
-
-                brclr   crank,engine,SAW_COUNTER
-                lda     feature4_f
-                bit     #multisparkb
-                beq     SAW_COUNTER
-;                brclr   multispark,feature4,SAW_COUNTER
-
-; at crank we always send 2048us as calibration and multi-spark init
-                clr     sawl
-                mov     #$08,sawh
-
-;Read the calculated width and store in timer
-SAW_COUNTER:
-                lda     sawl
-                add     T2CurrL
-                tax
-                lda     sawh
-                adc     T2CurrH
-                sta     T2CH1H
-                stx     T2CH1L
-
-                bclr    SparkTrigg,Sparkbits	; Clear spark trigg.
-					; Next time we get int turn off SAW
-
-                bclr    TOF,T2SC1	; clear any pending interrupt
-                bset    TOIE,T2SC1	; Enable timer interrupt
-
-                brset   DUALEDIS,personality,set_edis2
-                pulh
-                rti
-set_edis2:
-                CalcDwellspk		; set time before the other SAW starts
-                pulh
-                rti			; uses 0.1ms timer for 1/2 cycle time
-
-
-INT_SPARK_OFF:				; this is only used for EDIS so
-					; coilc has no meaning (yet!)
-                brset   invspk,EnhancedBits4,InvSparkOff
-
-                brset   REUSE_FIDLE,outputpins,stimef2
-                brset   coilbbit,coilsel,stimeb2
-                bclr    coila,portc	; Set spark on
-                bra     SparkOffDone
-stimeb2:
-                bclr    coilb,portc
-                bra     SparkOffDone
-stimef2:
-                bclr    iasc,porta
-                bra     SparkOffDone
-InvSparkOff:
-                brset   REUSE_FIDLE,outputpins,isof2
-                brset   coilbbit,coilsel,isob2
-                bset    coila,portc	; Set inverted spark on
-                bra     SparkOffDone
-isob2:
-                bset    coilb,portc
-                bra     SparkOffDone
-isof2:
-                bset    iasc,porta
-SparkOffDone:
-                bclr    SparkTrigg,Sparkbits	; No more sparks for this IRQ
-                bclr    TOIE,T2SC1	; Disable interrupts
-                pulh
-                rti
-*** end EDIS ***
 
 ***************************************************************************
 **
@@ -5043,60 +4321,60 @@ ck_page0:
         sta     personality		; move from flash to ram
 
 ;is PTC4 (pin11) an input (trig2) or output (shiftlight)
-        brclr   wd_2trig,feature1,ckp0_norm_ddrc
-        lda     #%00001111              ; make PTC4 an input for second trigger
-        bra     ckp0_ddrc
-ckp0_norm_ddrc:
+;*        brclr   wd_2trig,feature1,ckp0_norm_ddrc
+;*        lda     #%00001111              ; make PTC4 an input for second trigger
+;*        bra     ckp0_ddrc
+;*ckp0_norm_ddrc:
         lda     #%00011111		; ** Was 11111111
 ckp0_ddrc:
         sta     ddrc			; Outputs for LED
 
 ;decide if we are doing multiple wasted spark outputs
 ;check this here so a changed setting or MSQ load will correctly init the variables
-        brset   MSNEON,personality,pz_wspk
-        brset   WHEEL,personality,pz_wspk
-pz_nwspk:
-        bclr    wspk,EnhancedBits4	; set that we are NOT doing wasted spark
-        bra     DONE_B
-pz_wspk:
-        brclr   REUSE_LED19,outputpins,pz_nwspk
-        brset   rotary2,EnhancedBits5,pz_nwspk
+;*        brset   MSNEON,personality,pz_wspk
+;*        brset   WHEEL,personality,pz_wspk
+;*pz_nwspk:
+;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing wasted spark
+;*        bra     DONE_B
+;*pz_wspk:
+;*        brclr   REUSE_LED19,outputpins,pz_nwspk
+;*        brset   rotary2,EnhancedBits5,pz_nwspk
         bset    wspk,EnhancedBits4	; set that we are doing wasted spark
         bra     DONE_B
 
 ck_page3:
 ;see if inverted or non-inv output and use a quick bit
-        lda     SparkConfig1_f		; check if noninv or inv spark
-        bit     #M_SC1InvSpark
-        bne     ckp3_inv
-        bclr    invspk,EnhancedBits4	; set non-inverted
-        bra     ckp3_i_done
-ckp3_inv:
+;*        lda     SparkConfig1_f		; check if noninv or inv spark
+;*        bit     #M_SC1InvSpark
+;*        bne     ckp3_inv
+;*        bclr    invspk,EnhancedBits4	; set non-inverted
+;*        bra     ckp3_i_done
+;*ckp3_inv:
         bset    invspk,EnhancedBits4	; set inverted
 ckp3_i_done:
 
 
 ;EDIS and NEON are never next-cylinder
-        brset   EDIS,personality,not_nc
-        brset   MSNEON,personality,not_nc
+;*        brset   EDIS,personality,not_nc
+;*        brset   MSNEON,personality,not_nc
 
-        lda     TriggAngle_f
-        cmp     #57T			; check for next cyl mode
-        bhi     not_nc		; trigger angle > 20, continue
-        bset    nextcyl,EnhancedBits4
-        bra     DONE_B
-not_nc:
+;*        lda     TriggAngle_f
+;*        cmp     #57T			; check for next cyl mode
+;*        bhi     not_nc		; trigger angle > 20, continue
+;*        bset    nextcyl,EnhancedBits4
+;*        bra     DONE_B
+;*not_nc:
         bclr    nextcyl,EnhancedBits4
         bra     DONE_B
 
 ck_page7:
-        lda     p8feat1_f
-        bit     #rotary2b
-        beq     ckp7nr
-        bset    rotary2,EnhancedBits5
-        bclr    wspk,EnhancedBits4	; set that we are NOT doing normal wasted spark
-        bra     DONE_B
-ckp7nr:
+;*        lda     p8feat1_f
+;*        bit     #rotary2b
+;*        beq     ckp7nr
+;*        bset    rotary2,EnhancedBits5
+;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing normal wasted spark
+;*        bra     DONE_B
+;*ckp7nr:
         bclr    rotary2,EnhancedBits5
 DONE_B:
         bset    SCRIE,SCC2		; re-enable receive interrupt
