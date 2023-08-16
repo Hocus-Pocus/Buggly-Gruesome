@@ -36,7 +36,7 @@
 ; Port C
 ;  PTC0 - Squirt LED  or coil a                          ;* coila
 ;  PTC1 - Accel LED   or coil b or HEI7 bypass           ;* coilb
-;  PTC2 - Warmup LED  or coil c or output 4              ;* output4 (test LED)
+;  PTC2 - Warmup LED  or coil c or output 4              ;* wled (Synch LED)
 ;  PTC3 } multiplexed shift { or coil e
 ;  PTC4 } light outputs     { or 2nd trig input
 
@@ -406,17 +406,23 @@ w_no3:
         clr     rpm
         clr	flocker
         lda     #$00
-        sta     splitdelH       ; initial value for rotary split
-        sta     splitdelL
+;*        sta     splitdelH       ; initial value for rotary split
+;*        sta     splitdelL
+        sta     usc100Hprv  ;* Counter for IRQ period calcs Hi byte (.1mS free running counter previous)
+        sta     usc100Lprv  ;* Counter for IRQ period calcs Lo byte (.1mS free running counter previous)
+        sta     usc100H     ;* Counter for IRQ period calcs Hi byte (.1mS free running counter)
+        sta     usc100L     ;* Counter for IRQ period calcs Lo byte (.1
         sta     iTimepX
         sta     iTimepH
         sta     iTimepL
-        sta     KnockAngleRet
+;*        sta     KnockAngleRet
+        sta     IRQpL
         sta     KnockAdv
         sta     KnockTimLft
         sta     KnockAngle
         sta     TCAngle
-        sta     KnockBoost
+;*        sta     KnockBoost
+        sta     IRQpH
         sta     CltIatAngle
         sta     TCAccel
         sta     pwcalc1
@@ -524,9 +530,6 @@ w_no3:
 init_crang:
         lda     CrankAngle_f
         sta     SparkAngle
-;*        brset   EDIS,personality,init_edis
-
-;this won't work for next-cyl but will be ignored at low rpm anyway
         lda     TriggAngle_f
         sub     CrankAngle_f
         add     #28T			; - - 10deg
@@ -537,6 +540,7 @@ init_crang:
 init_wheel:
 	mov     #WHEELINIT,wheelcount	; holdoff for Neon/Wheel
         bclr    wsync,EnhancedBits6
+		bclr    wled,portc          ;* Synch LED off  RJH 8/11/23
         bset    whold,EnhancedBits6
         lda     #0
         sta     avgtoothh
@@ -546,7 +550,7 @@ init_wheel:
         sta     iTimeL
         sta     iTimeX
         bset    invspk,EnhancedBits4	; set inverted
-        bclr    rotary2,EnhancedBits5  ; clr rotary quick bit
+;*        bclr    rotary2,EnhancedBits5  ; clr rotary quick bit
         bset    wspk,EnhancedBits4	; set that we are doing wasted spark
 mv_init:
 ; set MegaView mode to block enhanced comms, S,P,R,X commands reset
@@ -710,6 +714,8 @@ Store_AirCor:
 **
 **  rpmk:rpmK+1 = RPM constant = (6,000 * (stroke/2))/ncyl
 **  rpmph:rpmpl = period count between IRQ pulsed lines, in 0.1 ms resolution
+**  4Cyl 4 stroke rpmk:rpmk+1 = (6,000 * (4/2)/4 = 3000T, $0BB8, %1011 1011 1000 
+**
 **
 ****************************************************************************
 
@@ -1912,16 +1918,16 @@ TRIM_DONE2:
 store_spark:
         brset   crank,engine,store_spark2	; if we are cranking skip
 					;to the save
-        add     CltIatAngle
-        add     KnockAngleRet
-        add     NitrousAngle
-        clc				; Clear carry bit **
-        add     TCAngle
-        bcc     Store_Spark_Ang		; Did we over flow with the
+;*        add     CltIatAngle
+;*        add     KnockAngleRet
+;*        add     NitrousAngle
+;*        clc				; Clear carry bit **
+;*        add     TCAngle
+;*        bcc     Store_Spark_Ang		; Did we over flow with the
 					; traction angle? **
-        lda     #28T			; Yes so limit angle to 0 deg **
+;*        lda     #28T			; Yes so limit angle to 0 deg **
 		
-Store_Spark_Ang:
+;*Store_Spark_Ang:
 
 store_spark2:
 CALC_DELAY:
@@ -2666,6 +2672,30 @@ TIMERROLL:
 					;(new output compare value)
 ;* end revised section
 
+;******************************************************************************
+; New code to delay wheel decode until IRQ period is short enough so 1uS 
+; timer won't overflow. This uses the 100uS counter usc100H:usc100L 
+; to measure the IRQ period. In the "decode_wheel" section of the DOSQUIRT  
+; interrupt routine, on the first IRQ signal the "IRQtime" bit is set to start  
+; the counter here. On the Next IRQ signal the "IRQtime" bit is cleared to 
+; stop the timer. usc100H:usc100L is copied to IRQpH:IRQpL and the "IRQtime" 
+; bit is set to start again. This cycle is repeated until the wheel can be 
+; decoded succesfully.
+;******************************************************************************
+
+    brclr  IRQtime,SparkBits,No_IRQtimer
+    inc    usc100L
+	bne    No_usc100L_roll
+    inc    usc100H
+
+No_usc100L_roll:    
+	
+No_IRQtimer:
+
+
+;******************************************************************************
+
+
 ;if we are stalled don't increment these or we might skip the wheeldecoder
         brclr    running,engine,TIMER_DONE
 
@@ -3049,6 +3079,7 @@ pass_store:
         sta      wheelcount		; (HoldSpark)
         mov     #WHEELINIT,wheelcount	; set !sync,holdoff, 3 teeth holdoff
         bclr    wsync,EnhancedBits6
+		bclr    wled,portc          ;* Synch LED off  RJH 8/11/23
         bset    whold,EnhancedBits6
         lda     #0
         sta     avgtoothh
@@ -3345,26 +3376,77 @@ decode_wheel:
 w_high:
         lda     rpm
         bne     w_high_fast
+		
+;******************************************************************************
+; New code to delay wheel decode until IRQ period is short enough so 1uS 
+; timer won't overflow. This uses the free running 100uS counter usc100H:usc100L 
+; to calculate the IRQ period. RJH 8/13/23
+; Check for very slow rpm that will cause timer overflow.
+; -1 wheel  does *1.5 so max time is 65/1.5 = 43ms  -> 38rpm on 36-1
+;******************************************************************************
+
+    brset   IRQtime,SparkBits,Getusc100  ;* If "IRQtime bit is already set, fall through
+	bset    IRQtime,Sparkbits
+	bra     j_lost_sync3
+	
+Getusc100:
+    sei                          ;* Disable interrpts for this section
+    bclr    IRQtime,Sparkbits    ;* stop the 100us timer
+    lda     usc100L              
+    sta     IRQpL                ;* usc100L -> IRQpL 
+    lda     usc100H
+    sta     IRQpH                ;* usc100H -> IRQpH
+    clr     usc100L              ;* Clear timer counter
+    clr     usc100H
+	bset    IRQtime,Sparkbits    ;* Restart the timer
+	cli                          ;* Enable interrupts again
+
+;**CalcIRQp:	
+;**    lda    usc100L
+;**	sub    usc100Lprv
+;**	sta    IRQpL
+;**	lda    usc100H
+;**	sbc    usc100Hprv
+;**	sta    IRQpH
+;**    lda    usc100H
+;**	sta    usc100Hprv
+;**	lda    usc100L
+;**	sta    usc100Lprv
+
+    lda    IRQpH          ;* IRQpH -> Accu A
+    cmp    #1             ;* Compare with 1 (25.6 ms)
+	blo    w_high_fast    ;* Hi byte = < 1 (less than 25.6 ms), go ahead and de-code
+	bhi    j_lost_sync2   ;* Minimum 51.2 mS, too slow, bail out now
+    lda    IRQpL          ;* IRQpL -> Accu A
+    cmp    #$90           ;* $90 = decimal 144	
+    bls    w_high_fast    ;* Hi byte = 1 (decimal 256, Lo byte lower or same as 144
+                          ;* period = 40 ms or less, go ahead and decode. If not 
+                          ;* lower or same crank is turning too slow to decode the wheel 
+                          ;* so bail out of here. 						  
+
+;******************************************************************************
         ;check for very slow rpm that will cause timer overflow.
         ;-1 does *1.5 so max time is 65/1.5 = 43ms  -> 38rpm on 36-1
         ;-2 does *2.5                       = 26ms  -> 38rpm on 60-2
         ;if this check omitted then wacky rpm displayed when really very slow
         ;65ms = $28F x0.1ms
 ;029q3 put it back in
-        lda     lowresH
-        cmp     #2
-        blo     w_high_fast  ; fast enough
-        bhi     j_lost_sync2        ; must re-sync - too slow
-        lda     lowresL             ; lowresH=2, so check low byte
-        cmp     #$88                ; give a little leeway (64.8ms)
-        blo     w_high_fast         ; if less then ok, otherwise re-sync
+;*        lda     lowresH
+;*        cmp     #2
+;*        blo     w_high_fast  ; fast enough
+;*        bhi     j_lost_sync2        ; must re-sync - too slow
+;*        lda     lowresL             ; lowresH=2, so check low byte
+;*        cmp     #$88                ; give a little leeway (64.8ms)
+;*        blo     w_high_fast         ; if less then ok, otherwise re-sync
 
 j_lost_sync2:
         clr     lowresL     ; always reset the lowres ready for next int
         clr     lowresH
+		
+j_lost_sync3:
         jmp     lost_sync_w
 		
-w_high_fast:
+w_high_fast:    ;* 1us timer
        ;T2 already read at start of handler
         lda     T2CurrL
         sub     T2PrevL			; Calculate cycle time
@@ -3496,10 +3578,8 @@ w_comp:
 is_miss:
         clr     wheelcount		; declare we are synced and
 					; reset counter
-;now check if 2nd trigger input is set, if so start 2nd revolution at num teeth
-; i.e. on a 60-2,  0-359 deg =  0-59
-;                360-719 deg = 60-119
         bset    wsync,EnhancedBits6
+		bset    wled,portc           ;* Synch LED on  RJH 8/11/23
 
 not_miss:
         brset   crank,engine,tooth_noavg    ; do not use 025 style during cranking
@@ -3509,7 +3589,7 @@ not_miss:
         beq     tooth_avg
 
 tooth_noavg:
-;like old method, just store previoud period
+;like old method, just store previous period
         lda     cTimeH
         sta     avgtoothh
         lda     cTimeL
@@ -3632,6 +3712,7 @@ lost_sync_w:				; we found too many teeth after
 					; bad we'd better start all over
         mov     #WHEELINIT,wheelcount	; was %10000000 (missing #)
         bclr    wsync,EnhancedBits6
+		bclr    wled,portc          ;* Synch LED off  RJH 8/11/23
         bset    whold,EnhancedBits6
 ;NEW
         lda     #0
@@ -3746,6 +3827,24 @@ CYCLE_CALC:
 ;022b 0 T2 is now 24 bit with the extra software byte but may slow this routine
 ;excessively if we do 24bit maths here in an interrupt handler.
 ;Stick with Magnus' 0.1ms method for now as it works.
+
+;***********************************************************************************************
+;
+; RPM = CONSTANT/PERIOD
+; Where:
+; RPM         = Engine RPM
+; RPM_K = 16 bit constant using .1ms clock tick (10khz)
+;               ((10,000tickpsec*60secpmin)/(number of cyl/(stroke/2)))
+; RPM_P = 16 bit period count between ignition events in 0.1ms
+;               resolution
+;   RPM_K
+;   ----- = RPM
+;   RPM_P
+;
+; 4cyl 4stroke RPMK = ((10,000*60)/2) = 300,000, $4 93E0, %0100 1001 0011 1110 0000
+;
+; rpmch:rpmcl is calculaed in the .1ms section of TIMERROLL after synchronisation. 
+;***********************************************************************************************
 
 
         lda     #0
@@ -4375,7 +4474,7 @@ ck_page7:
 ;*        bclr    wspk,EnhancedBits4	; set that we are NOT doing normal wasted spark
 ;*        bra     DONE_B
 ;*ckp7nr:
-        bclr    rotary2,EnhancedBits5
+;*        bclr    rotary2,EnhancedBits5
 DONE_B:
         bset    SCRIE,SCC2		; re-enable receive interrupt
         jmp     DONE_RCV

@@ -1,5 +1,5 @@
 ;****************************************************************************
-;* msns-extra.h MexACVW version, include file for msns-extra.h MexACVW version 
+;* msns-extra.h MexACVW3 version, include file for msns-extra.h MexACVW version 
 ;* By Robert Hiebert, Project started July 11 2023
 ;*
 ;* This is a stripped down, no frills version of the MSnS extra 029y4a
@@ -36,7 +36,7 @@
 ; Port C
 ;  PTC0 - Squirt LED  or coil a                          ;* coila
 ;  PTC1 - Accel LED   or coil b or HEI7 bypass           ;* coilb
-;  PTC2 - Warmup LED  or coil c or output 4
+;  PTC2 - Warmup LED  or coil c or output 4              ;* wled (Synch LED)
 ;  PTC3 } multiplexed shift { or coil e
 ;  PTC4 } light outputs     { or 2nd trig input
 
@@ -172,7 +172,8 @@ dwellcd         equ 3   ; used for rotary to tell calcdwellspk not to dwell trai
 rise            equ 4   ; found a rising IRQ edge / 2nd multispark / coilcbit
 lc_fs           equ 5   ; doing flat shift vs. launch
 trigret         equ 6   ; falling edge at end of short pulses - sets crank timing
-Knocked         equ 7   ; Knock system working
+;*Knocked         equ 7   ; Knock system working
+IRQtime         equ 7   ; 100us counter for IRQ period enable/disable
 
 ; Rev limiter variables
 RevLimBits      ds  1   ; Rev limiter status bits
@@ -345,8 +346,10 @@ rpmph:           ds  1   ; High part of RPM Period
 rpmpl:           ds  1   ; Low part of RPM Period
 rpmch:           ds  1   ; Counter for high part of RPM
 rpmcl:           ds  1   ; Counter for low part of RPM
-idleph           ds  1T
-idlepl           ds  1T
+;*idleph           ds  1T
+;*idlepl           ds  1T
+usc100H:         ds  1T  ;* Counter for IRQ period calcs Hi byte (.1mS rolling counter)
+usc100L:         ds  1T  ;* Counter for IRQ period calcs Lo byte (.1mS rolling counter)
 
 flocker:         ds  1   ; Flash locker semaphore
 
@@ -523,10 +526,14 @@ sparktargetl:     ds  1  ; L
 iTimepX:          ds  1
 iTimepH:          ds  1  ; previous hi-res cycle time (for accel/decel)
 iTimepL:          ds  1  ;
-splitdelH:        ds  1  ; trailing split delay for rotary
-splitdelL:        ds  1
-KnockBoost        ds  1  ; Boost to remove from controller if Knock detected
-KnockAngleRet:    ds  1  ; Knock Angle storage
+;*splitdelH:        ds  1  ; trailing split delay for rotary
+;*splitdelL:        ds  1
+usc100Hprv:       ds  1 ;* Counter for IRQ period calcs Hi byte (.1mS rolling counter previous)
+usc100Lprv:       ds  1 ;* Counter for IRQ period calcs Lo byte (.1mS rolling counter previous)
+;*KnockBoost        ds  1  ; Boost to remove from controller if Knock detected
+;*KnockAngleRet:    ds  1  ; Knock Angle storage
+IRQpH:            ds  1  ;* IRQ period Hi byte
+IRQpL:            ds  1  ;* IRQ period Lo byte
 rpmlast:          ds  1  ; RPM accel dot last value
 VlaunchLimit:     ds  1  ; Variable Launch RPM value
 page:             ds  1
